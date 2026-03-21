@@ -10,40 +10,48 @@ import '../shared/widgets/app_bottom_nav.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
-final router = GoRouter(
-  navigatorKey: _rootNavigatorKey,
-  initialLocation: '/radar',
-  routes: [
-    // Full-screen onboarding (no bottom nav)
-    GoRoute(
-      path: '/onboarding',
-      parentNavigatorKey: _rootNavigatorKey,
-      builder: (context, state) => const OnboardingScreen(),
-    ),
+/// Creates the app router. If [onboardingCompleted] is false,
+/// redirects all tab routes to /onboarding.
+GoRouter createRouter(bool onboardingCompleted) {
+  return GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    initialLocation: onboardingCompleted ? '/radar' : '/onboarding',
+    redirect: (context, state) {
+      final isOnboarding = state.uri.path == '/onboarding';
 
-    // Shell route for bottom nav tabs
-    ShellRoute(
-      navigatorKey: _shellNavigatorKey,
-      builder: (context, state, child) {
-        return _ScaffoldWithNav(child: child);
-      },
-      routes: [
-        GoRoute(
-          path: '/radar',
-          builder: (context, state) => const RadarScreen(),
-        ),
-        GoRoute(
-          path: '/feed',
-          builder: (context, state) => const FeedScreen(),
-        ),
-        GoRoute(
-          path: '/profile',
-          builder: (context, state) => const ProfileScreen(),
-        ),
-      ],
-    ),
-  ],
-);
+      if (!onboardingCompleted && !isOnboarding) return '/onboarding';
+      if (onboardingCompleted && isOnboarding) return '/radar';
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: '/onboarding',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      ShellRoute(
+        navigatorKey: _shellNavigatorKey,
+        builder: (context, state, child) {
+          return _ScaffoldWithNav(child: child);
+        },
+        routes: [
+          GoRoute(
+            path: '/radar',
+            builder: (context, state) => const RadarScreen(),
+          ),
+          GoRoute(
+            path: '/feed',
+            builder: (context, state) => const FeedScreen(),
+          ),
+          GoRoute(
+            path: '/profile',
+            builder: (context, state) => const ProfileScreen(),
+          ),
+        ],
+      ),
+    ],
+  );
+}
 
 class _ScaffoldWithNav extends StatelessWidget {
   const _ScaffoldWithNav({required this.child});

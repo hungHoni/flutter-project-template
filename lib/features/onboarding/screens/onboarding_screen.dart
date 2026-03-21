@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../theme/app_typography.dart';
+import '../models/onboarding_state.dart';
+import '../providers/onboarding_provider.dart';
+import '../widgets/experience_step.dart';
+import '../widgets/role_step.dart';
+import '../widgets/skills_step.dart';
+import '../widgets/sources_step.dart';
+import '../widgets/welcome_step.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> {
+class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
-  int _currentPage = 0;
-
-  static const _stepTitles = [
-    'Welcome',
-    'Your Role',
-    'Your Skills',
-    'Experience Level',
-    'Feed Sources',
-  ];
 
   @override
   void dispose() {
@@ -29,97 +29,149 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  void _goToStep(int step) {
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _next() {
+    final state = ref.read(onboardingProvider);
+    ref.read(onboardingProvider.notifier).nextStep();
+    _goToStep(state.currentStep + 1);
+  }
+
+  void _back() {
+    final state = ref.read(onboardingProvider);
+    ref.read(onboardingProvider.notifier).previousStep();
+    _goToStep(state.currentStep - 1);
+  }
+
+  Future<void> _complete() async {
+    await ref.read(onboardingProvider.notifier).completeOnboarding();
+    if (mounted) {
+      context.go('/radar');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(onboardingProvider);
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // Step indicator
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: List.generate(
-                  5,
-                  (index) => Expanded(
-                    child: Container(
-                      height: 2,
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: index <= _currentPage
-                            ? AppColors.primary
-                            : AppColors.border,
-                        borderRadius: BorderRadius.circular(1),
+            // Step indicator (hidden on welcome)
+            if (state.currentStep > 0)
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                child: Row(
+                  children: List.generate(
+                    OnboardingState.totalSteps,
+                    (index) => Expanded(
+                      child: Container(
+                        height: 2,
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: index <= state.currentStep
+                              ? AppColors.primary
+                              : AppColors.border,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // Page content
+            // Pages
             Expanded(
-              child: PageView.builder(
+              child: PageView(
                 controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() => _currentPage = index);
-                },
-                itemCount: 5,
-                itemBuilder: (context, index) {
-                  return _StepPlaceholder(
-                    title: _stepTitles[index],
-                    step: index + 1,
-                  );
-                },
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  WelcomeStep(onGetStarted: _next),
+                  RoleStep(
+                    selectedRole: state.role,
+                    onRoleSelected:
+                        ref.read(onboardingProvider.notifier).setRole,
+                  ),
+                  SkillsStep(
+                    selectedSkills: state.skills,
+                    onSkillToggled:
+                        ref.read(onboardingProvider.notifier).toggleSkill,
+                  ),
+                  ExperienceStep(
+                    selectedLevel: state.experienceLevel,
+                    onLevelSelected: ref
+                        .read(onboardingProvider.notifier)
+                        .setExperienceLevel,
+                  ),
+                  SourcesStep(
+                    selectedSources: state.feedSources,
+                    onSourceToggled:
+                        ref.read(onboardingProvider.notifier).toggleSource,
+                  ),
+                ],
               ),
             ),
+
+            // Bottom action bar (hidden on welcome)
+            if (state.currentStep > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.md,
+                ),
+                decoration: const BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: AppColors.border),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Row(
+                    children: [
+                      TextButton(
+                        onPressed: _back,
+                        child: Text(
+                          'Back',
+                          style: AppTypography.button.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      if (state.currentStep < OnboardingState.totalSteps - 1)
+                        ElevatedButton(
+                          onPressed: state.canProceed ? _next : null,
+                          child: Text(
+                            'Continue',
+                            style:
+                                AppTypography.button.copyWith(color: Colors.white),
+                          ),
+                        )
+                      else
+                        ElevatedButton(
+                          onPressed: state.canProceed ? _complete : null,
+                          child: Text(
+                            'Complete Setup',
+                            style:
+                                AppTypography.button.copyWith(color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _StepPlaceholder extends StatelessWidget {
-  const _StepPlaceholder({
-    required this.title,
-    required this.step,
-  });
-
-  final String title;
-  final int step;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            title,
-            style: AppTypography.display,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'STEP $step OF 5',
-            style: AppTypography.meta,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Text(
-            'COMING SOON',
-            style: AppTypography.meta.copyWith(
-              color: AppColors.textMeta,
-              letterSpacing: 2,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
       ),
     );
   }

@@ -20,8 +20,12 @@ class AppColors {
 
   // ── Text ──
   static const Color textPrimary = Color(0xFF1A1A1A);
-  static const Color textSecondary = Color(0xFF666666);
+  static const Color textSecondary = Color(0xFF777777);
   static const Color textMeta = Color(0xFF999999);
+
+  // ── Accent ──
+  static const Color trending = Color(0xFFB8860B);
+  static const Color surfaceDark = Color(0xFF1A1A1A);
 
   // ── Semantic ──
   static const Color error = Color(0xFFDC3545);
