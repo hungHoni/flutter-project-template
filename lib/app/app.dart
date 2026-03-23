@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/onboarding/providers/onboarding_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'providers/auth_provider.dart';
 import 'router.dart';
 
 class App extends ConsumerWidget {
@@ -11,6 +12,9 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Kick off anonymous auth in the background — don't block UI.
+    ref.watch(authStateProvider);
+
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
 
     return onboardingCompleted.when(
