@@ -1,8 +1,8 @@
-# Handoff: AI Skill Radar — Flutter Implementation
+# Handoff: AI Skill Radar — Steps 1-3 Complete
 
 **Date:** 2026-03-21
 **Branch:** main
-**Last Commit:** 74ae694 feat: scaffold Flutter project with Anduin blue theme
+**Last Commit:** 384f1ea feat(firebase): add Firebase core, auth, Firestore, and messaging setup
 
 ## Goal
 
@@ -14,84 +14,107 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - [x] Wireframes created (`docs/wireframe-sketch.html`, `docs/wireframe-sketch.png`)
 - [x] Engineering review passed (plan-eng-review)
 - [x] Design review passed (plan-design-review)
-- [x] Implementation plan created (`.claude/archon/plans/flutter-scaffold-anduin-theme.md`)
 - [x] **Step 1: Flutter scaffold with Anduin blue theme** — all 13 tasks complete:
-  - Flutter project created with org `com.anduin`
-  - Riverpod, GoRouter, Phosphor icons, Google Fonts, dio, freezed configured
-  - 11 color tokens (Anduin Blue `#3FA6EE` primary)
-  - 8 typography tokens (Instrument Serif, DM Sans, JetBrains Mono)
-  - 7 spacing tokens (xs=4 through xxxl=60)
-  - Phosphor icon mappings for nav, trends, actions, states
+  - Flutter project with org `com.anduin`, Riverpod, GoRouter, Phosphor icons, Google Fonts
+  - 13 color tokens, 8 typography tokens, 7 spacing tokens, Phosphor icon mappings
   - Full ThemeData with zero elevation, flat borders, no Material defaults
   - Custom bottom nav with dot indicator + count badge
-  - 4 placeholder screens (onboarding with PageView, radar, feed, profile)
   - GoRouter with ShellRoute for tabs + full-screen onboarding route
-  - ProviderScope + MaterialApp.router wired up
-  - `flutter analyze`: zero issues, debug APK builds successfully
+- [x] **Step 2: Onboarding flow** — 5-step PageView fully implemented:
+  - Welcome step (serif headline "Your AI Radar" + CTA)
+  - Role step (single-select chips, 8 roles)
+  - Skills step (multi-select chips, 17 AI skills, selected count display)
+  - Experience step (3 large tappable cards: beginner/intermediate/advanced)
+  - Sources step (toggle switch list, 6 feed sources with defaults)
+  - SharedPreferences persistence for onboarding completion
+  - Router redirect logic (non-completed → /onboarding, completed → /radar)
+  - Reusable SelectableChip and StepHeader shared widgets
+  - 2 widget tests passing (first launch → onboarding, completed → radar)
+- [x] Design system QA fixes applied:
+  - textSecondary corrected to `#777777`, typography sizes matched to design doc
+  - Label font changed to JetBrains Mono, button color to primaryDark for WCAG AA
+  - Added missing color tokens (trending `#B8860B`, surfaceDark `#1A1A1A`)
+
+- [x] **Step 3: Firebase setup** — all tasks complete:
+  - Added firebase_core, cloud_firestore, firebase_auth, firebase_messaging to pubspec.yaml
+  - Firebase.initializeApp() in main.dart with DefaultFirebaseOptions
+  - Placeholder firebase_options.dart (replace via `flutterfire configure`)
+  - Anonymous auth Riverpod provider (authStateProvider, authStreamProvider)
+  - Auth kicked off in background from app.dart (non-blocking)
+  - iOS minimum set to 13.0 (Podfile), Android minSdk set to 23
+  - **Manual step required:** Create Firebase project → run `flutterfire configure` → enable Anonymous Auth + Firestore in console
 
 ## In Progress / Next Steps
 
-The design doc (`docs/design-ai-skill-radar.md`) outlines 11 implementation steps. Step 1 is done. Remaining:
-
-- [ ] **Step 2: Onboarding flow** — 5-step PageView (welcome, role, skills, experience, sources) with chip selection UI
-- [ ] **Step 3: Firebase setup** — Firestore, anonymous auth, Cloud Functions scaffold
 - [ ] **Step 4: Firestore data model** — `users/{uid}`, `articles/{id}`, `briefs/{uid}/weekly/{weekId}`
 - [ ] **Step 5: RSS feed ingestion** — Cloud Function to fetch Reddit, HN, blog RSS feeds
 - [ ] **Step 6: Claude API integration** — Cloud Function for article summarization + skill extraction
-- [ ] **Step 7: Radar dashboard** — Today's brief + skill gap list with trend labels (New/Rising/Hot)
-- [ ] **Step 8: Feed screen** — Tabbed articles (All/Reddit/HN/Blogs) with SKILL GAP badges
+- [ ] **Step 7: Radar dashboard** — Today's brief + skill gap list with trend labels
+- [ ] **Step 8: Feed screen** — Tabbed articles with SKILL GAP badges
 - [ ] **Step 9: Profile screen** — Edit role, skills, feed sources
 - [ ] **Step 10: Push notifications** — FCM for weekly skill brief
 - [ ] **Step 11: Polish** — Animations, error states, empty states, offline mode
 
 ## Key Decisions
 
-- **Anduin Blue `#3FA6EE`**: Extracted from anduintransact.com. Fails WCAG AA for text on white (2.9:1) — use `primaryDark` (`#2B7AB8`, 4.6:1) for text links.
-- **Firebase over Supabase**: User chose Firebase for backend (Firestore, Cloud Functions, FCM, anonymous auth).
-- **Trend labels computed client-side**: New/Rising/Hot classification happens in Dart, not by Claude API (Claude can't see historical data).
-- **Critical-path tests only for MVP**: 4 tests (trend computation, RSS dedup, Claude JSON parsing, Firestore rules). Expanded coverage deferred to TODOS.md.
-- **freezed + json_serializable**: Chosen for model serialization over manual fromJson.
-- **Feature-first folder structure**: `lib/features/{feature}/screens/` not layer-first.
-- **No Material defaults**: Zero elevation everywhere, custom everything, Phosphor icons only.
-- **Editorial typography**: Instrument Serif (serif display), DM Sans (sans-serif body), JetBrains Mono (monospace meta).
-- **First analysis triggers on onboarding completion**: User doesn't wait until 6AM cron for first brief.
+- **Router architecture**: `createRouter(bool)` receives sync bool, App widget handles async SharedPreferences via FutureProvider — avoids async issues in redirect callbacks
+- **Anduin Blue `#3FA6EE`**: Fails WCAG AA for text on white (2.9:1) — use `primaryDark` (`#2B7AB8`, 4.6:1) for text links
+- **Firebase over Supabase**: User chose Firebase for backend
+- **Trend labels computed client-side**: New/Rising/Hot classification in Dart, not Claude API
+- **freezed + json_serializable**: For model serialization
+- **Feature-first folder structure**: `lib/features/{feature}/screens/`
+- **No Material defaults**: Zero elevation everywhere, Phosphor icons only
+- **Editorial typography**: Instrument Serif (display), DM Sans (body), JetBrains Mono (meta)
 
 ## Dead Ends (Don't Repeat These)
 
-- **Browse `file://` URLs**: gstack browse blocks `file://` scheme. Serve via `python3 -m http.server` and use `http://localhost:PORT/` instead.
-- **Stitch MCP for UI**: User mentioned Stitch MCP for UI developing — it's available but not yet used. Can be leveraged for future screen implementations.
+- **FutureProvider in router redirect**: Tried having `createRouter(WidgetRef ref)` read `onboardingCompletedProvider` inside redirect callback. Provider hadn't resolved when redirect ran. Fix: App watches provider, passes resolved bool to router.
+- **`find.text('Your AI\nRadar')` in tests**: Newline didn't match rendered Text widget. Use `find.textContaining('Your AI')` instead.
+- **Switch.adaptive `activeColor`**: Deprecated after Flutter v3.31.0-2.0.pre. Use `activeTrackColor` + `activeThumbColor` separately.
+- **Browse `file://` URLs**: gstack browse blocks `file://` scheme. Serve via `python3 -m http.server` instead.
 
 ## Files Changed
 
-### New (project scaffold)
-- `lib/theme/app_colors.dart` — 11 color tokens
-- `lib/theme/app_typography.dart` — 8 text style tokens with Google Fonts
-- `lib/theme/app_spacing.dart` — 7 spacing constants
-- `lib/theme/app_icons.dart` — Phosphor icon mappings
-- `lib/theme/app_theme.dart` — ThemeData factory, zero elevation
+### Step 3 (Firebase setup)
+- `pubspec.yaml` — Added firebase_core, cloud_firestore, firebase_auth, firebase_messaging
+- `lib/main.dart` — Firebase.initializeApp() before runApp
+- `lib/firebase_options.dart` — NEW: Placeholder config (replace via flutterfire configure)
+- `lib/app/providers/auth_provider.dart` — NEW: Anonymous auth + auth stream providers
+- `lib/app/app.dart` — Watches authStateProvider to kick off auth
+- `ios/Podfile` — Set platform to iOS 13.0
+- `android/app/build.gradle.kts` — Set minSdk to 23
+
+### Step 1 (scaffold)
+- `lib/theme/` — app_colors.dart, app_typography.dart, app_spacing.dart, app_icons.dart, app_theme.dart
 - `lib/shared/widgets/app_bottom_nav.dart` — Custom bottom nav with badges
-- `lib/features/onboarding/screens/onboarding_screen.dart` — 5-step PageView placeholder
-- `lib/features/radar/screens/radar_screen.dart` — Radar placeholder
-- `lib/features/feed/screens/feed_screen.dart` — Feed placeholder
-- `lib/features/profile/screens/profile_screen.dart` — Profile placeholder
-- `lib/app/router.dart` — GoRouter with ShellRoute + onboarding
+- `lib/features/{radar,feed,profile}/screens/` — Placeholder screens
+- `lib/app/router.dart` — GoRouter with ShellRoute
 - `lib/app/app.dart` — MaterialApp.router wrapper
 - `lib/main.dart` — ProviderScope entry point
-- `docs/design-ai-skill-radar.md` — Approved design doc (source of truth)
-- `docs/wireframe-sketch.html` + `.png` — UI wireframes
-- `docs/test-plan.md` — QA test plan
-- `TODOS.md` — 3 deferred items
-- `.claude/archon/plans/flutter-scaffold-anduin-theme.md` — Step 1 plan (executed)
+
+### Step 2 (onboarding)
+- `lib/features/onboarding/models/onboarding_state.dart` — NEW: Data model with per-step validation
+- `lib/features/onboarding/providers/onboarding_provider.dart` — NEW: StateNotifier + FutureProvider
+- `lib/features/onboarding/screens/onboarding_screen.dart` — REWRITTEN: ConsumerStatefulWidget with PageView
+- `lib/features/onboarding/widgets/` — NEW: welcome_step, role_step, skills_step, experience_step, sources_step
+- `lib/shared/widgets/selectable_chip.dart` — NEW: Reusable animated chip
+- `lib/shared/widgets/step_header.dart` — NEW: Reusable step header
+- `lib/app/app.dart` — REWRITTEN: ConsumerWidget with async loading
+- `lib/app/router.dart` — REWRITTEN: `createRouter(bool onboardingCompleted)`
+- `test/widget_test.dart` — REWRITTEN: SharedPreferences mock tests
 
 ## Current State
 
-- **flutter analyze:** zero issues
-- **flutter build apk --debug:** builds successfully
-- **Tests:** Default smoke test updated, passes
-- **Git:** Clean working tree, 1 unpushed commit on main
+- **Tests:** 2/2 passing (`flutter test`)
+- **Analyze:** 0 issues (`flutter analyze`)
+- **Build:** Working (iOS simulator verified via QA)
+- **Git:** 3 unpushed commits on main
+- **Firebase:** Dependencies added, initialization code in place. Needs `flutterfire configure` with a real Firebase project before the app can connect.
 
 ## Context for Next Session
 
-Step 1 (scaffold) is fully complete and committed. The next major work is **Step 2: Onboarding flow** — building out the 5-step PageView with actual chip selection UI for role, skills, experience level, and feed sources. The design doc at `docs/design-ai-skill-radar.md` has the full spec including interaction states and user journey. The user wants to use the `/minimalist-flutter-ui` skill for all UI work and mentioned interest in using Stitch MCP for UI component generation.
+Steps 1–3 are complete — scaffold, onboarding, and Firebase setup all in place. The app compiles and tests pass, but Firebase won't connect until the user creates a project and runs `flutterfire configure`. Next is Step 4 (Firestore data model with freezed models), then Step 5 (RSS Cloud Functions). All placeholder screens (radar, feed, profile) are minimal and ready to be replaced in Steps 7–9.
 
-**Recommended first action:** Read `docs/design-ai-skill-radar.md` and implement Step 2 (Onboarding flow) starting with the welcome screen, then role selection with chips.
+**Manual prerequisite for Step 4:** User must create a Firebase project, run `flutterfire configure`, and enable Anonymous Auth + Firestore in the Firebase console.
+
+**Recommended first action:** `Read docs/design-ai-skill-radar.md and HANDOFF.md, then proceed with Step 4: Firestore data model.`
