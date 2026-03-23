@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "281211180526",
+    "project_id": "skillradar-b5774",
+    "storage_bucket": "skillradar-b5774.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:281211180526:android:67e9f9c611b204fcc5eaff",
+        "android_client_info": {
+          "package_name": "com.anduin.ai_skill_radar"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3Ohc-NJK1zn8QZ-ELT4Bi077Uk7jOiKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

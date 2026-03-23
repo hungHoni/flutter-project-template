@@ -1,8 +1,8 @@
-# Handoff: AI Skill Radar — Steps 1-3 Complete
+# Handoff: AI Skill Radar — Steps 1-4 Complete
 
 **Date:** 2026-03-21
 **Branch:** main
-**Last Commit:** 384f1ea feat(firebase): add Firebase core, auth, Firestore, and messaging setup
+**Last Commit:** 5631fd9 docs: update HANDOFF.md for Step 3 completion, clean up template docs
 
 ## Goal
 
@@ -43,10 +43,18 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
   - Auth kicked off in background from app.dart (non-blocking)
   - iOS minimum set to 13.0 (Podfile), Android minSdk set to 23
   - **Manual step required:** Create Firebase project → run `flutterfire configure` → enable Anonymous Auth + Firestore in console
+- [x] **Step 4: Firestore data model** — all freezed + json_serializable models complete:
+  - `UserProfile` — role, skills, level, feedSources, fcmToken, createdAt
+  - `Article` — source, sourceName, title, excerpt, url, tags, isSkillGap, timestamps
+  - `DailyBrief` — summary, gapCount, embedded list of `SkillGap`
+  - `SkillGap` — name, trend, mentionCount, suggestedAction, detectedAt, weekId (shared by DailyBrief + WeeklySkillGaps)
+  - `WeeklySkillGaps` — gaps list keyed by weekId
+  - `TimestampConverter` — Firestore Timestamp ↔ DateTime (uses `dynamic` JSON type to avoid import issues in generated code)
+  - Barrel export at `lib/models/models.dart`
+  - Moved `freezed_annotation` to dependencies, added `json_annotation`
 
 ## In Progress / Next Steps
 
-- [ ] **Step 4: Firestore data model** — `users/{uid}`, `articles/{id}`, `briefs/{uid}/weekly/{weekId}`
 - [ ] **Step 5: RSS feed ingestion** — Cloud Function to fetch Reddit, HN, blog RSS feeds
 - [ ] **Step 6: Claude API integration** — Cloud Function for article summarization + skill extraction
 - [ ] **Step 7: Radar dashboard** — Today's brief + skill gap list with trend labels
@@ -61,7 +69,7 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **Anduin Blue `#3FA6EE`**: Fails WCAG AA for text on white (2.9:1) — use `primaryDark` (`#2B7AB8`, 4.6:1) for text links
 - **Firebase over Supabase**: User chose Firebase for backend
 - **Trend labels computed client-side**: New/Rising/Hot classification in Dart, not Claude API
-- **freezed + json_serializable**: For model serialization
+- **freezed + json_serializable**: For model serialization. `TimestampConverter` uses `dynamic` as JSON type (not `Timestamp`) so generated `.g.dart` files don't need `cloud_firestore` import
 - **Feature-first folder structure**: `lib/features/{feature}/screens/`
 - **No Material defaults**: Zero elevation everywhere, Phosphor icons only
 - **Editorial typography**: Instrument Serif (display), DM Sans (body), JetBrains Mono (meta)
@@ -72,8 +80,19 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **`find.text('Your AI\nRadar')` in tests**: Newline didn't match rendered Text widget. Use `find.textContaining('Your AI')` instead.
 - **Switch.adaptive `activeColor`**: Deprecated after Flutter v3.31.0-2.0.pre. Use `activeTrackColor` + `activeThumbColor` separately.
 - **Browse `file://` URLs**: gstack browse blocks `file://` scheme. Serve via `python3 -m http.server` instead.
+- **TimestampConverter with `Timestamp` type**: `JsonConverter<DateTime, Timestamp>` causes `cast_to_non_type` errors in generated `.g.dart` files because they don't import `cloud_firestore`. Fix: use `JsonConverter<DateTime, dynamic>` instead.
 
 ## Files Changed
+
+### Step 4 (Firestore data model)
+- `pubspec.yaml` — Moved freezed_annotation to dependencies, added json_annotation
+- `lib/models/timestamp_converter.dart` — NEW: Firestore Timestamp ↔ DateTime converter
+- `lib/models/user_profile.dart` — NEW: freezed model for users/{uid}
+- `lib/models/article.dart` — NEW: freezed model for articles/{id}
+- `lib/models/daily_brief.dart` — NEW: DailyBrief + SkillGap freezed models
+- `lib/models/weekly_skill_gaps.dart` — NEW: freezed model for skillGaps/{weekId}
+- `lib/models/models.dart` — NEW: barrel export
+- `lib/models/*.freezed.dart` + `*.g.dart` — GENERATED: build_runner output
 
 ### Step 3 (Firebase setup)
 - `pubspec.yaml` — Added firebase_core, cloud_firestore, firebase_auth, firebase_messaging
@@ -108,13 +127,14 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **Tests:** 2/2 passing (`flutter test`)
 - **Analyze:** 0 issues (`flutter analyze`)
 - **Build:** Working (iOS simulator verified via QA)
-- **Git:** 3 unpushed commits on main
+- **Git:** 4 unpushed commits on main (pending Step 4 commit)
 - **Firebase:** Dependencies added, initialization code in place. Needs `flutterfire configure` with a real Firebase project before the app can connect.
+- **Models:** All 5 Firestore document models generated with freezed + json_serializable. Ready for Riverpod providers + Firestore repository layer.
 
 ## Context for Next Session
 
-Steps 1–3 are complete — scaffold, onboarding, and Firebase setup all in place. The app compiles and tests pass, but Firebase won't connect until the user creates a project and runs `flutterfire configure`. Next is Step 4 (Firestore data model with freezed models), then Step 5 (RSS Cloud Functions). All placeholder screens (radar, feed, profile) are minimal and ready to be replaced in Steps 7–9.
+Steps 1–4 are complete — scaffold, onboarding, Firebase setup, and data models all in place. The app compiles and tests pass, but Firebase won't connect until the user creates a project and runs `flutterfire configure`. Next is Step 5 (RSS Cloud Functions), which requires a `functions/` directory with Node.js Cloud Functions. All placeholder screens (radar, feed, profile) are minimal and ready to be replaced in Steps 7–9.
 
-**Manual prerequisite for Step 4:** User must create a Firebase project, run `flutterfire configure`, and enable Anonymous Auth + Firestore in the Firebase console.
+**Manual prerequisite before Step 5:** User must create a Firebase project, run `flutterfire configure`, and enable Anonymous Auth + Firestore in the Firebase console. Then `firebase init functions` to scaffold the Cloud Functions directory.
 
-**Recommended first action:** `Read docs/design-ai-skill-radar.md and HANDOFF.md, then proceed with Step 4: Firestore data model.`
+**Recommended first action:** `Read docs/design-ai-skill-radar.md and HANDOFF.md, then proceed with Step 5: RSS feed ingestion Cloud Function.`
