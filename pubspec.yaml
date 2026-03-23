@@ -23,6 +23,8 @@ dependencies:
   firebase_messaging: ^15.2.4
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
+  xml: ^6.5.0
+  crypto: ^3.0.0
 
 dev_dependencies:
   flutter_test:

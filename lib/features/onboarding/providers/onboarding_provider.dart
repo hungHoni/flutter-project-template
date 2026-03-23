@@ -1,6 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../app/providers/auth_provider.dart';
+import '../../../models/user_profile.dart';
+import '../../profile/repositories/user_profile_repository.dart';
 import '../models/onboarding_state.dart';
 
 const _onboardingCompleteKey = 'onboarding_complete';
@@ -71,6 +74,21 @@ class OnboardingNotifier extends StateNotifier<OnboardingState> {
   Future<void> completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_onboardingCompleteKey, true);
+
+    // Write user profile to Firestore.
+    final user = _ref.read(authStateProvider).valueOrNull;
+    if (user != null) {
+      final repo = _ref.read(userProfileRepositoryProvider);
+      final profile = UserProfile(
+        role: state.role ?? 'Other',
+        skills: state.skills,
+        level: state.experienceLevel ?? 'Beginner',
+        feedSources: state.feedSources,
+        createdAt: DateTime.now(),
+      );
+      await repo.saveProfile(user.uid, profile);
+    }
+
     state = state.copyWith(isComplete: true);
     _ref.invalidate(onboardingCompletedProvider);
   }

@@ -1,4 +1,4 @@
-# Handoff: AI Skill Radar — Steps 1-4, 7-9 Complete
+# Handoff: AI Skill Radar — Steps 1-5, 7-9 Complete
 
 **Date:** 2026-03-21
 **Branch:** main
@@ -45,124 +45,121 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
   - `UserProfile` — role, skills, level, feedSources, fcmToken, createdAt
   - `Article` — source, sourceName, title, excerpt, url, tags, isSkillGap, timestamps
   - `DailyBrief` — summary, gapCount, embedded list of `SkillGap`
-  - `SkillGap` — name, trend, mentionCount, suggestedAction, detectedAt, weekId (shared by DailyBrief + WeeklySkillGaps)
+  - `SkillGap` — name, trend, mentionCount, suggestedAction, detectedAt, weekId
   - `WeeklySkillGaps` — gaps list keyed by weekId
-  - `TimestampConverter` — Firestore Timestamp ↔ DateTime (uses `dynamic` JSON type to avoid import issues in generated code)
+  - `TimestampConverter` — Firestore Timestamp ↔ DateTime
   - Barrel export at `lib/models/models.dart`
-  - Moved `freezed_annotation` to dependencies, added `json_annotation`
+- [x] **Step 5: RSS feed ingestion** — client-side implementation (no Blaze required):
+  - **Firestore provider** — `firestoreProvider` exposing FirebaseFirestore instance
+  - **ArticleRepository** — Firestore CRUD for `articles/{id}` with SHA-256 URL hashing, watchArticles stream, upsert, exists check
+  - **RssService** — Client-side RSS/Atom fetcher via `dio` + `xml`:
+    - Reddit: fetches `/r/{sub}/hot.rss` Atom XML with User-Agent header, 60min rate limit
+    - Hacker News: fetches top stories via JSON API (topstories + item endpoints)
+    - AI Blogs: RSS 2.0 from Google AI Blog, OpenAI Blog
+    - HTML stripping + 200-char excerpt truncation
+    - Per-source try/catch — partial results on failure
+  - **FeedSyncService** — Orchestrates fetch → deduplicate (by URL hash) → write to Firestore
+  - **Article Riverpod providers** — `articlesStreamProvider(source)` StreamProvider.family, `feedSyncProvider` for initial sync, `feedSyncNotifierProvider` for pull-to-refresh
+  - **UserProfileRepository** — Firestore CRUD for `users/{uid}`, watchProfile stream, saveProfile, updateField
+  - **UserProfile provider** — `userProfileProvider` StreamProvider reading current user's profile
+  - **timeAgo utility** — DateTime to relative time string ("2h ago", "1d ago", etc.)
+  - **Feed screen wired to Firestore** — ConsumerWidget watching articlesStreamProvider per tab, RefreshIndicator for pull-to-refresh, Article model replaces mock _ArticleItem
+  - **Profile screen wired to Firestore** — ConsumerWidget watching userProfileProvider, writes changes via updateField
+  - **Onboarding writes to Firestore** — completeOnboarding() creates UserProfile in Firestore
+  - Added `xml: ^6.5.0` and `crypto: ^3.0.0` dependencies
 - [x] **Step 7: Radar dashboard** — full screen with mock data:
   - "Your Radar" serif headline with formatted date subtitle
-  - TODAY'S BRIEF card — container with border, monospace label, body text
-  - "N NEW GAPS THIS WEEK" section header in JetBrains Mono
-  - Gap cards with trend badges (HOT/RISING/NEW) using color-coded icons
-  - Mention counts and suggested action rows with arrow icons
-  - 5 mock skill gaps: Structured Outputs, Agentic Tool Use, MCP Servers, Multimodal RAG, Voice Agents
-- [x] **Step 8: Feed screen** — tabbed article feed with mock data:
-  - DefaultTabController with All/Reddit/HN/Blogs tabs
-  - Tab bar with JetBrains Mono labels, Anduin blue indicator, border divider
-  - Article cards: gold monospace source label, serif headline, body excerpt (2-line clamp)
-  - Tag chips with SKILL GAP badge (Anduin blue highlight) and regular topic tags
-  - url_launcher integration for article tap → browser
-  - Filtered tabs: each tab filters _mockArticles by source type
-  - 5 mock articles spanning reddit, HN, and blog sources
-- [x] **Step 9: Profile screen** — editable settings with mock state:
-  - "Profile" serif headline with "YOUR SETTINGS" monospace subtitle
-  - YOUR ROLE section — single-select chips (8 roles from onboarding data)
-  - EXPERIENCE LEVEL section — single-select chips (Beginner/Intermediate/Advanced)
-  - YOUR SKILLS section — multi-select chips (17 skills), selected count in header
-  - FEED SOURCES section — toggle switches in bordered container with source icons
-  - ABOUT section — App version, data storage, AI info in monospace label/value rows
-  - StatefulWidget with local mock state (ready to wire to Riverpod + Firestore)
+  - TODAY'S BRIEF card, gap cards with HOT/RISING/NEW trend badges
+  - 5 mock skill gaps (Radar keeps mock data until Step 6 Claude API)
+- [x] **Step 8: Feed screen** — now wired to live Firestore data:
+  - Tabbed articles (All/Reddit/HN/Blogs) from Firestore streams
+  - Pull-to-refresh triggers RSS sync
+  - Loading/error/empty states
+- [x] **Step 9: Profile screen** — now wired to live Firestore data:
+  - Reads/writes role, skills, level, feedSources to Firestore in real time
+  - About section with app info
 
 ## In Progress / Next Steps
 
-- [ ] **Step 5: RSS feed ingestion** — Cloud Function to fetch Reddit, HN, blog RSS feeds *(blocked: requires Firebase Blaze plan for Cloud Functions)*
-- [ ] **Step 6: Claude API integration** — Cloud Function for article summarization + skill extraction *(blocked: requires Firebase Blaze plan)*
+- [ ] **Step 6: Claude API integration** — Cloud Function for article summarization + skill extraction *(blocked: requires Firebase Blaze plan for Cloud Functions, or can be done client-side with Claude SDK)*
 - [ ] **Step 10: Push notifications** — FCM for weekly skill brief
 - [ ] **Step 11: Polish** — Animations, error states, empty states, offline mode
+- [ ] **Phase B: Server-side RSS** — When Blaze plan active: move RSS fetching to scheduled Cloud Function, delete client-side `rss_service.dart` + `feed_sync_service.dart`
 
 ## Key Decisions
 
-- **Router architecture**: `createRouter(bool)` receives sync bool, App widget handles async SharedPreferences via FutureProvider — avoids async issues in redirect callbacks
-- **Anduin Blue `#3FA6EE`**: Fails WCAG AA for text on white (2.9:1) — use `primaryDark` (`#2B7AB8`, 4.6:1) for text links
+- **Router architecture**: `createRouter(bool)` receives sync bool, App widget handles async SharedPreferences via FutureProvider
+- **Anduin Blue `#3FA6EE`**: Fails WCAG AA for text on white — use `primaryDark` (`#2B7AB8`, 4.6:1) for text links
 - **Firebase over Supabase**: User chose Firebase for backend
 - **Trend labels computed client-side**: New/Rising/Hot classification in Dart, not Claude API
-- **freezed + json_serializable**: For model serialization. `TimestampConverter` uses `dynamic` as JSON type (not `Timestamp`) so generated `.g.dart` files don't need `cloud_firestore` import
+- **freezed + json_serializable**: `TimestampConverter` uses `dynamic` as JSON type
 - **Feature-first folder structure**: `lib/features/{feature}/screens/`
-- **No Material defaults**: Zero elevation everywhere, Phosphor icons only
+- **No Material defaults**: Zero elevation, Phosphor icons only
 - **Editorial typography**: Instrument Serif (display), DM Sans (body), JetBrains Mono (meta)
-- **Steps 5-6 skipped to 7-9**: Cloud Functions require Blaze plan. Built UI screens first with mock data, ready to wire to Firestore when backend is available.
-- **Profile uses local StatefulWidget**: Mock state for now — will be replaced by Riverpod providers + Firestore when Steps 5-6 unblock.
+- **Client-side RSS over Cloud Functions**: Blaze plan not required. RssService fetches directly from app via `dio`. Repository + providers remain identical when migrating to server-side — only the writer changes.
+- **URL hash as document ID**: `sha256(url).substring(0, 20)` for stable cross-platform dedup
+- **60-minute rate limit per source**: In-memory `Map<String, DateTime>` prevents excessive API calls
+- **Profile uses Riverpod + Firestore**: ConsumerWidget watches `userProfileProvider`, writes changes via `userProfileRepositoryProvider`
 
 ## Dead Ends (Don't Repeat These)
 
-- **FutureProvider in router redirect**: Tried having `createRouter(WidgetRef ref)` read `onboardingCompletedProvider` inside redirect callback. Provider hadn't resolved when redirect ran. Fix: App watches provider, passes resolved bool to router.
-- **`find.text('Your AI\nRadar')` in tests**: Newline didn't match rendered Text widget. Use `find.textContaining('Your AI')` instead.
-- **Switch.adaptive `activeColor`**: Deprecated after Flutter v3.31.0-2.0.pre. Use `activeTrackColor` + `activeThumbColor` separately.
-- **Browse `file://` URLs**: gstack browse blocks `file://` scheme. Serve via `python3 -m http.server` instead.
-- **TimestampConverter with `Timestamp` type**: `JsonConverter<DateTime, Timestamp>` causes `cast_to_non_type` errors in generated `.g.dart` files because they don't import `cloud_firestore`. Fix: use `JsonConverter<DateTime, dynamic>` instead.
-- **`flutterfire configure` PATH**: `$HOME/.pub-cache/bin` must be on PATH. Add `export PATH="$PATH":"$HOME/.pub-cache/bin"` to `~/.zshrc`.
-- **`flutterfire configure` interactive mode**: Fails in non-interactive shell. Use `--project=skillradar-b5774 --yes` flags.
-- **Web blank screen without web config**: firebase_options.dart must include `kIsWeb` check with web-specific `FirebaseOptions`. Without it, `UnsupportedError` silently fails on web.
+- **FutureProvider in router redirect**: Provider hadn't resolved when redirect ran. Fix: App watches provider, passes resolved bool to router.
+- **`find.text('Your AI\nRadar')` in tests**: Use `find.textContaining('Your AI')` instead.
+- **Switch.adaptive `activeColor`**: Deprecated. Use `activeTrackColor` + `activeThumbColor`.
+- **Browse `file://` URLs**: Serve via `python3 -m http.server` instead.
+- **TimestampConverter with `Timestamp` type**: Use `JsonConverter<DateTime, dynamic>` instead.
+- **`flutterfire configure` PATH**: Add `$HOME/.pub-cache/bin` to PATH.
+- **`flutterfire configure` interactive mode**: Use `--project=skillradar-b5774 --yes` flags.
+- **Web blank screen without web config**: firebase_options.dart must include `kIsWeb` check.
 
 ## Files Changed
 
+### Step 5 (RSS feed ingestion + Firestore wiring)
+- `pubspec.yaml` — Added xml, crypto dependencies
+- `lib/app/providers/firestore_provider.dart` — NEW: FirebaseFirestore instance provider
+- `lib/features/feed/repositories/article_repository.dart` — NEW: Firestore CRUD for articles, SHA-256 URL hashing
+- `lib/features/feed/services/rss_service.dart` — NEW: Client-side RSS/Atom/JSON fetcher (Reddit, HN, Blogs)
+- `lib/features/feed/services/feed_sync_service.dart` — NEW: Fetch → dedup → Firestore orchestrator
+- `lib/features/feed/providers/article_providers.dart` — NEW: StreamProvider.family + sync notifier
+- `lib/shared/utils/time_ago.dart` — NEW: DateTime to relative time string
+- `lib/features/profile/repositories/user_profile_repository.dart` — NEW: Firestore CRUD for user profiles
+- `lib/features/profile/providers/user_profile_provider.dart` — NEW: StreamProvider for current user profile
+- `lib/features/feed/screens/feed_screen.dart` — REWRITTEN: ConsumerWidget with Firestore streams, pull-to-refresh
+- `lib/features/profile/screens/profile_screen.dart` — REWRITTEN: ConsumerWidget with Firestore read/write
+- `lib/features/onboarding/providers/onboarding_provider.dart` — MODIFIED: Writes UserProfile to Firestore on completion
+
 ### Steps 7-9 (UI screens)
-- `lib/features/radar/screens/radar_screen.dart` — REWRITTEN: Full radar dashboard with brief card, gap cards, trend badges
-- `lib/features/feed/screens/feed_screen.dart` — REWRITTEN: Tabbed feed with article cards, source filters, SKILL GAP tags
-- `lib/features/profile/screens/profile_screen.dart` — REWRITTEN: Editable role, skills, experience, sources, about sections
+- `lib/features/radar/screens/radar_screen.dart` — Full radar dashboard with brief card, gap cards, trend badges
+- `lib/features/feed/screens/feed_screen.dart` — Tabbed feed (now Firestore-backed)
+- `lib/features/profile/screens/profile_screen.dart` — Editable settings (now Firestore-backed)
 
 ### Step 4 (Firestore data model)
-- `pubspec.yaml` — Moved freezed_annotation to dependencies, added json_annotation
-- `lib/models/timestamp_converter.dart` — NEW: Firestore Timestamp ↔ DateTime converter
-- `lib/models/user_profile.dart` — NEW: freezed model for users/{uid}
-- `lib/models/article.dart` — NEW: freezed model for articles/{id}
-- `lib/models/daily_brief.dart` — NEW: DailyBrief + SkillGap freezed models
-- `lib/models/weekly_skill_gaps.dart` — NEW: freezed model for skillGaps/{weekId}
-- `lib/models/models.dart` — NEW: barrel export
-- `lib/models/*.freezed.dart` + `*.g.dart` — GENERATED: build_runner output
+- `lib/models/` — All freezed models + generated code
 
 ### Step 3 (Firebase setup)
-- `pubspec.yaml` — Added firebase_core, cloud_firestore, firebase_auth, firebase_messaging
-- `lib/main.dart` — Firebase.initializeApp() before runApp
-- `lib/firebase_options.dart` — Generated via flutterfire configure (skillradar-b5774)
-- `lib/app/providers/auth_provider.dart` — NEW: Anonymous auth + auth stream providers
-- `lib/app/app.dart` — Watches authStateProvider to kick off auth
-- `ios/Podfile` — Set platform to iOS 13.0
-- `android/app/build.gradle.kts` — Set minSdk to 23
+- Firebase initialization, auth providers, platform configs
 
-### Step 1 (scaffold)
-- `lib/theme/` — app_colors.dart, app_typography.dart, app_spacing.dart, app_icons.dart, app_theme.dart
-- `lib/shared/widgets/app_bottom_nav.dart` — Custom bottom nav with badges
-- `lib/features/{radar,feed,profile}/screens/` — Placeholder screens
-- `lib/app/router.dart` — GoRouter with ShellRoute
-- `lib/app/app.dart` — MaterialApp.router wrapper
-- `lib/main.dart` — ProviderScope entry point
-
-### Step 2 (onboarding)
-- `lib/features/onboarding/models/onboarding_state.dart` — NEW: Data model with per-step validation
-- `lib/features/onboarding/providers/onboarding_provider.dart` — NEW: StateNotifier + FutureProvider
-- `lib/features/onboarding/screens/onboarding_screen.dart` — REWRITTEN: ConsumerStatefulWidget with PageView
-- `lib/features/onboarding/widgets/` — NEW: welcome_step, role_step, skills_step, experience_step, sources_step
-- `lib/shared/widgets/selectable_chip.dart` — NEW: Reusable animated chip
-- `lib/shared/widgets/step_header.dart` — NEW: Reusable step header
-- `lib/app/app.dart` — REWRITTEN: ConsumerWidget with async loading
-- `lib/app/router.dart` — REWRITTEN: `createRouter(bool onboardingCompleted)`
-- `test/widget_test.dart` — REWRITTEN: SharedPreferences mock tests
+### Steps 1-2 (Scaffold + Onboarding)
+- Theme, router, bottom nav, onboarding flow, shared widgets
 
 ## Current State
 
 - **Tests:** 2/2 passing (`flutter test`)
 - **Analyze:** 0 issues (`flutter analyze`)
-- **Build:** Working (web verified, iOS simulator verified via QA)
 - **Firebase:** Connected to project skillradar-b5774. Anonymous Auth + Firestore enabled.
-- **Models:** All 5 Firestore document models generated with freezed + json_serializable.
-- **UI Screens:** All 3 main screens (Radar, Feed, Profile) built with mock data, ready to wire to Firestore providers.
+- **Models:** All 5 Firestore document models generated.
+- **Feed:** Live RSS ingestion → Firestore → StreamProvider → UI. Pull-to-refresh supported.
+- **Profile:** Reads/writes to Firestore in real time.
+- **Radar:** Still uses mock data (needs Claude API for DailyBrief generation).
 
 ## Context for Next Session
 
-Steps 1–4 and 7–9 are complete. The app has a full UI with mock data across all three tabs. Steps 5-6 (Cloud Functions for RSS ingestion and Claude API) are blocked until the user upgrades to Firebase Blaze plan. Once unblocked, the flow is: Cloud Functions write articles to Firestore → Riverpod providers read from Firestore → UI screens display live data instead of mocks.
+Steps 1-5 and 7-9 are complete. The app fetches live RSS articles client-side (Reddit, HN, AI blogs), stores them in Firestore with URL-hash deduplication, and displays them in the Feed screen via Riverpod StreamProviders. The Profile screen reads/writes user preferences to Firestore. Onboarding creates the Firestore user document.
 
-**To unblock Steps 5-6:** Upgrade Firebase project to Blaze plan, then run `firebase init functions` to scaffold the Cloud Functions directory.
+**Radar screen still uses mock data** — it needs DailyBrief + SkillGap data generated by Claude API (Step 6). This can be done client-side with the Anthropic Dart SDK or server-side with Cloud Functions.
 
-**Recommended first action:** `Read docs/design-ai-skill-radar.md and HANDOFF.md, then proceed with Step 5: RSS feed ingestion Cloud Function (requires Blaze plan) or Step 10: Push notifications.`
+**Next steps:**
+1. Step 6: Claude API integration (summarize articles → generate DailyBrief + SkillGaps)
+2. Step 10: Push notifications (FCM)
+3. Step 11: Polish (animations, error states, offline mode)
+4. Phase B: Move RSS to server-side Cloud Function when Blaze plan is active
