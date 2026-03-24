@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Articles: any authenticated user can read; only server (admin SDK) should write.
+    // For client-side RSS ingestion (Phase A), we allow authenticated writes too.
+    match /articles/{articleId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // User profiles: owner can read/write their own profile.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Daily briefs: owner can read their own briefs.
+    match /users/{userId}/briefs/{briefId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Weekly skill gaps: owner can read their own.
+    match /users/{userId}/skillGaps/{weekId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
