@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 
@@ -38,7 +39,7 @@ class StepHeader extends StatelessWidget {
             Text(
               subtitle!,
               style: AppTypography.body.copyWith(
-                color: const Color(0xFF777777),
+                color: AppColors.textSecondary,
               ),
             ),
           ],
