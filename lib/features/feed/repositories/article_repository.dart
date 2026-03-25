@@ -35,6 +35,25 @@ class ArticleRepository {
     });
   }
 
+  /// Fetches the next page of articles after [lastFetchedAt].
+  Future<List<Article>> fetchArticlesPage({
+    String? source,
+    required DateTime lastFetchedAt,
+    int limit = 20,
+  }) async {
+    Query<Map<String, dynamic>> query = _collection
+        .orderBy('fetchedAt', descending: true)
+        .startAfter([Timestamp.fromDate(lastFetchedAt)])
+        .limit(limit);
+
+    if (source != null) {
+      query = query.where('source', isEqualTo: source);
+    }
+
+    final snapshot = await query.get();
+    return snapshot.docs.map((doc) => Article.fromJson(doc.data())).toList();
+  }
+
   /// Writes an article to Firestore. Overwrites if ID already exists.
   Future<void> upsertArticle(String id, Article article) {
     return _collection.doc(id).set(article.toJson());
