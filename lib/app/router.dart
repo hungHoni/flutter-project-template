@@ -6,6 +6,7 @@ import '../features/onboarding/screens/onboarding_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/radar/screens/radar_screen.dart';
 import '../shared/widgets/app_bottom_nav.dart';
+import '../shared/widgets/offline_banner.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -37,19 +38,42 @@ GoRouter createRouter(bool onboardingCompleted) {
         routes: [
           GoRoute(
             path: '/radar',
-            builder: (context, state) => const RadarScreen(),
+            pageBuilder: (context, state) => _fadePage(
+              key: state.pageKey,
+              child: const RadarScreen(),
+            ),
           ),
           GoRoute(
             path: '/feed',
-            builder: (context, state) => const FeedScreen(),
+            pageBuilder: (context, state) => _fadePage(
+              key: state.pageKey,
+              child: const FeedScreen(),
+            ),
           ),
           GoRoute(
             path: '/profile',
-            builder: (context, state) => const ProfileScreen(),
+            pageBuilder: (context, state) => _fadePage(
+              key: state.pageKey,
+              child: const ProfileScreen(),
+            ),
           ),
         ],
       ),
     ],
+  );
+}
+
+CustomTransitionPage<void> _fadePage({
+  required LocalKey key,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: key,
+    child: child,
+    transitionDuration: const Duration(milliseconds: 200),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(opacity: animation, child: child);
+    },
   );
 }
 
@@ -68,7 +92,12 @@ class _ScaffoldWithNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: child,
+      body: Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(child: child),
+        ],
+      ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex(context),
         onTap: (index) {

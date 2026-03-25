@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../models/article.dart';
 import '../../../shared/utils/time_ago.dart';
+import '../../../shared/widgets/scroll_entry.dart';
+import '../../../shared/widgets/skeleton_card.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_spacing.dart';
 import '../../../theme/app_typography.dart';
@@ -18,7 +22,6 @@ class FeedScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Trigger initial feed sync (fire-and-forget).
     ref.watch(feedSyncProvider);
 
     return DefaultTabController(
@@ -59,7 +62,8 @@ class FeedScreen extends ConsumerWidget {
               Expanded(
                 child: TabBarView(
                   children: _tabFilters
-                      .map((filter) => _ArticleStreamList(sourceFilter: filter))
+                      .map((filter) =>
+                          _ArticleStreamList(sourceFilter: filter))
                       .toList(),
                 ),
               ),
@@ -80,14 +84,36 @@ class _ArticleStreamList extends ConsumerWidget {
     final articlesAsync = ref.watch(articlesStreamProvider(sourceFilter));
 
     return articlesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          children: [
+            SkeletonCard.article(),
+            SkeletonCard.article(),
+            SkeletonCard.article(),
+            SkeletonCard.article(),
+          ],
+        ),
+      ),
       error: (error, _) => Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Text(
-            'Could not load articles.\nPull down to retry.',
-            style: AppTypography.body.copyWith(color: AppColors.textMeta),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PhosphorIcon(
+                PhosphorIcons.warningCircle(PhosphorIconsStyle.thin),
+                size: 48,
+                color: AppColors.textMeta,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Could not load articles.\nPull down to retry.',
+                style:
+                    AppTypography.body.copyWith(color: AppColors.textMeta),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ),
@@ -96,11 +122,22 @@ class _ArticleStreamList extends ConsumerWidget {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(AppSpacing.xl),
-              child: Text(
-                'No articles yet.\nPull down to sync feeds.',
-                style:
-                    AppTypography.body.copyWith(color: AppColors.textMeta),
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PhosphorIcon(
+                    PhosphorIcons.newspaper(PhosphorIconsStyle.thin),
+                    size: 48,
+                    color: AppColors.textMeta,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'No articles yet.\nPull down to sync feeds.',
+                    style: AppTypography.body
+                        .copyWith(color: AppColors.textMeta),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           );
@@ -109,6 +146,7 @@ class _ArticleStreamList extends ConsumerWidget {
         return RefreshIndicator(
           color: AppColors.primary,
           onRefresh: () async {
+            HapticFeedback.mediumImpact();
             final notifier = ref.read(feedSyncNotifierProvider.notifier);
             await notifier.refresh(const [
               'r/MachineLearning',
@@ -122,8 +160,10 @@ class _ArticleStreamList extends ConsumerWidget {
             itemCount: articles.length,
             separatorBuilder: (_, __) =>
                 const SizedBox(height: AppSpacing.sm),
-            itemBuilder: (context, index) =>
-                _ArticleCard(article: articles[index]),
+            itemBuilder: (context, index) => ScrollEntryWidget(
+              delay: Duration(milliseconds: 60 * index),
+              child: _ArticleCard(article: articles[index]),
+            ),
           ),
         );
       },

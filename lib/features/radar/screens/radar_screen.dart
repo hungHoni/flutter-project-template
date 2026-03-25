@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../models/daily_brief.dart';
+import '../../../shared/widgets/scroll_entry.dart';
+import '../../../shared/widgets/skeleton_card.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/app_icons.dart';
 import '../../../theme/app_spacing.dart';
@@ -22,7 +25,6 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
   @override
   void initState() {
     super.initState();
-    // Trigger initial analysis on first load.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeRefresh();
     });
@@ -49,7 +51,10 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
-          onRefresh: () => ref.read(radarRefreshProvider.notifier).refresh(),
+          onRefresh: () {
+            HapticFeedback.mediumImpact();
+            return ref.read(radarRefreshProvider.notifier).refresh();
+          },
           child: ListView(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.lg,
@@ -61,8 +66,6 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
               const SizedBox(height: AppSpacing.xs),
               Text(dateStr.toUpperCase(), style: AppTypography.meta),
               const SizedBox(height: AppSpacing.xl),
-
-              // Determine if we have a real brief (not just null from stream).
               ..._buildContent(briefAsync, refreshState, ref),
             ],
           ),
@@ -79,12 +82,18 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
     final brief = briefAsync.valueOrNull;
     final hasBrief = brief != null;
 
-    // Loading — no brief yet.
+    // Loading — show skeleton.
     if (refreshState.isLoading && !hasBrief) {
-      return [const _LoadingState()];
+      return [
+        SkeletonCard.brief(),
+        const SizedBox(height: AppSpacing.md),
+        SkeletonCard.gap(),
+        SkeletonCard.gap(),
+        SkeletonCard.gap(),
+      ];
     }
 
-    // Error — no brief to fall back on. Show actual error.
+    // Error — no brief to fall back on.
     if (refreshState.hasError && !hasBrief) {
       return [
         _ErrorState(
@@ -94,9 +103,14 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
       ];
     }
 
-    // Brief stream still loading (first open).
+    // Brief stream still loading.
     if (briefAsync.isLoading && !hasBrief) {
-      return [const _LoadingState()];
+      return [
+        SkeletonCard.brief(),
+        const SizedBox(height: AppSpacing.md),
+        SkeletonCard.gap(),
+        SkeletonCard.gap(),
+      ];
     }
 
     // Brief stream errored.
@@ -109,10 +123,15 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
       ];
     }
 
-    // No brief exists yet — show empty state.
+    // No brief exists yet — empty state.
     if (!hasBrief) {
       if (refreshState.isLoading) {
-        return [const _LoadingState()];
+        return [
+          SkeletonCard.brief(),
+          const SizedBox(height: AppSpacing.md),
+          SkeletonCard.gap(),
+          SkeletonCard.gap(),
+        ];
       }
       return [
         _EmptyState(
@@ -121,10 +140,45 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
       ];
     }
 
-    // We have a brief — show it.
+    // We have a brief — show with scroll entry animations.
     return [
-      _BriefContent(brief: brief),
-      // Show spinner if refreshing with existing data.
+      ScrollEntryWidget(
+        child: _BriefCard(brief: brief.summary),
+      ),
+      const SizedBox(height: AppSpacing.xl),
+      if (brief.gaps.isNotEmpty) ...[
+        ScrollEntryWidget(
+          delay: const Duration(milliseconds: 80),
+          child: Text(
+            '${brief.gaps.length} NEW GAPS THIS WEEK',
+            style: AppTypography.label.copyWith(
+              color: AppColors.primaryDark,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        for (var i = 0; i < brief.gaps.length; i++)
+          ScrollEntryWidget(
+            delay: Duration(milliseconds: 160 + (80 * i)),
+            child: _GapCard(gap: brief.gaps[i]),
+          ),
+      ] else
+        ScrollEntryWidget(
+          delay: const Duration(milliseconds: 80),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'No new gaps this week. You\'re up to date!',
+              style: AppTypography.body.copyWith(color: AppColors.textMeta),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
       if (refreshState.isLoading) ...[
         const SizedBox(height: AppSpacing.md),
         const Center(
@@ -135,7 +189,6 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
           ),
         ),
       ],
-      // Show error banner if refresh failed but we have cached data.
       if (refreshState.hasError) ...[
         const SizedBox(height: AppSpacing.md),
         Container(
@@ -168,7 +221,6 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
     if (msg.contains('Not authenticated')) {
       return 'Not signed in yet. Please wait a moment and retry.';
     }
-    // Show actual error for debugging.
     return 'Error: ${msg.length > 200 ? msg.substring(0, 200) : msg}';
   }
 
@@ -178,46 +230,6 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
       'July', 'August', 'September', 'October', 'November', 'December',
     ];
     return months[month - 1];
-  }
-}
-
-/// Shows the full brief + gaps content.
-class _BriefContent extends StatelessWidget {
-  const _BriefContent({required this.brief});
-  final DailyBrief brief;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _BriefCard(brief: brief.summary),
-        const SizedBox(height: AppSpacing.xl),
-        if (brief.gaps.isNotEmpty) ...[
-          Text(
-            '${brief.gaps.length} NEW GAPS THIS WEEK',
-            style: AppTypography.label.copyWith(
-              color: AppColors.primaryDark,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ...brief.gaps.map((gap) => _GapCard(gap: gap)),
-        ] else
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              border: Border.all(color: AppColors.border),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              'No new gaps this week. You\'re up to date!',
-              style: AppTypography.body.copyWith(color: AppColors.textMeta),
-              textAlign: TextAlign.center,
-            ),
-          ),
-      ],
-    );
   }
 }
 
@@ -344,41 +356,6 @@ class _TrendBadge extends StatelessWidget {
   }
 }
 
-class _LoadingState extends StatelessWidget {
-  const _LoadingState();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.xl),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border.all(color: AppColors.border),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              const SizedBox(
-                width: 32,
-                height: 32,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'Scanning the AI landscape for you...',
-                style: AppTypography.body.copyWith(color: AppColors.textMeta),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onGenerate});
   final VoidCallback onGenerate;
@@ -394,6 +371,12 @@ class _EmptyState extends StatelessWidget {
       ),
       child: Column(
         children: [
+          PhosphorIcon(
+            PhosphorIcons.crosshair(PhosphorIconsStyle.thin),
+            size: 48,
+            color: AppColors.textMeta,
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text(
             'Your first radar is brewing...',
             style: AppTypography.title,
@@ -437,6 +420,12 @@ class _ErrorState extends StatelessWidget {
       ),
       child: Column(
         children: [
+          PhosphorIcon(
+            PhosphorIcons.warningCircle(PhosphorIconsStyle.thin),
+            size: 48,
+            color: AppColors.textMeta,
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text(
             message,
             style: AppTypography.body.copyWith(color: AppColors.textMeta),
