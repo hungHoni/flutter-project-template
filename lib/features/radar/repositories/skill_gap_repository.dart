@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/firestore_provider.dart';
 import '../../../models/daily_brief.dart';
 import '../../../models/weekly_skill_gaps.dart';
+import '../../../shared/utils/date_utils.dart';
 
 /// Firestore CRUD for `users/{uid}/skillGaps/{weekId}`.
 class SkillGapRepository {
@@ -42,10 +43,7 @@ class SkillGapRepository {
     final results = <WeeklySkillGaps>[];
     for (var i = 1; i <= count; i++) {
       final date = now.subtract(Duration(days: 7 * i));
-      final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays + 1;
-      final weekNumber = ((dayOfYear - date.weekday + 10) / 7).floor();
-      final weekId =
-          '${date.year}-W${weekNumber.toString().padLeft(2, '0')}';
+      final weekId = isoWeekId(date);
       final snap = await _collection(uid).doc(weekId).get();
       if (snap.exists && snap.data() != null) {
         results.add(WeeklySkillGaps.fromJson(snap.data()!));

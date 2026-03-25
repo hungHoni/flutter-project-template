@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/firestore_provider.dart';
 import '../../../models/daily_brief.dart';
+import '../../../shared/utils/date_utils.dart';
 
 /// Firestore CRUD for `users/{uid}/briefs/{date}`.
 class BriefRepository {
@@ -27,10 +28,7 @@ class BriefRepository {
 
   /// Watches today's brief by date string. No composite index required.
   Stream<DailyBrief?> watchTodaysBrief(String uid) {
-    final now = DateTime.now();
-    final date =
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    return watchBrief(uid, date);
+    return watchBrief(uid, todayId());
   }
 }
 

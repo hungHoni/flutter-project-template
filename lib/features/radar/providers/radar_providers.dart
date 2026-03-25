@@ -6,27 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/auth_provider.dart';
 import '../../../models/daily_brief.dart';
-import '../../../models/user_profile.dart';
+import '../../../shared/utils/date_utils.dart';
 import '../../feed/repositories/article_repository.dart';
 import '../../profile/providers/user_profile_provider.dart';
 import '../repositories/brief_repository.dart';
 import '../repositories/skill_gap_repository.dart';
 import '../services/claude_service.dart';
 import '../services/trend_service.dart';
-
-/// Today's date formatted as yyyy-MM-dd for Firestore doc ID.
-String _todayId() {
-  final now = DateTime.now();
-  return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-}
-
-/// Current ISO week ID (e.g. "2026-W12").
-String _currentWeekId() {
-  final now = DateTime.now();
-  final dayOfYear = now.difference(DateTime(now.year, 1, 1)).inDays + 1;
-  final weekNumber = ((dayOfYear - now.weekday + 10) / 7).floor();
-  return '${now.year}-W${weekNumber.toString().padLeft(2, '0')}';
-}
 
 /// Streams today's brief from Firestore.
 final todaysBriefProvider = StreamProvider<DailyBrief?>((ref) {
@@ -55,35 +41,16 @@ class RadarRefreshNotifier extends AutoDisposeAsyncNotifier<void> {
 
   Future<void> _runAnalysis() async {
     debugPrint('[Radar] Starting analysis...');
-    // Wait for auth to resolve (may still be loading on app start).
-    var user = ref.read(authStateProvider).valueOrNull;
-    if (user == null) {
-      // Wait up to 10 seconds for auth.
-      for (var i = 0; i < 20 && user == null; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        user = ref.read(authStateProvider).valueOrNull;
-      }
-      if (user == null) throw Exception('Not authenticated');
-    }
+    // Await auth future — no polling needed.
+    final user = await ref.read(authStateProvider.future);
+    if (user == null) throw Exception('Not authenticated');
     debugPrint('[Radar] Auth OK: ${user.uid}');
 
-    // Wait for profile to resolve (may still be loading on app start).
-    var profile = ref.read(userProfileProvider).valueOrNull;
+    // Await profile future.
+    final profile = await ref.read(userProfileProvider.future);
     if (profile == null) {
-      // Wait up to 5 seconds for profile.
-      for (var i = 0; i < 10 && profile == null; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-        profile = ref.read(userProfileProvider).valueOrNull;
-      }
+      throw Exception('Profile not loaded. Complete onboarding first.');
     }
-    // Use default profile if none exists (e.g. fresh install, no onboarding yet).
-    profile ??= UserProfile(
-      role: 'Software Engineer',
-      skills: const [],
-      level: 'Intermediate',
-      feedSources: const ['r/MachineLearning', 'Hacker News', 'AI Blogs'],
-      createdAt: DateTime.now(),
-    );
 
     // Read recent articles from Firestore (all sources, last 50).
     final articleRepo = ref.read(articleRepositoryProvider);
@@ -115,7 +82,7 @@ class RadarRefreshNotifier extends AutoDisposeAsyncNotifier<void> {
     final trendService = TrendService();
 
     final now = DateTime.now();
-    final weekId = _currentWeekId();
+    final weekId = isoWeekId();
 
     // Convert Claude gaps to SkillGap models.
     final rawGaps = result.gaps.map((g) {
@@ -136,13 +103,14 @@ class RadarRefreshNotifier extends AutoDisposeAsyncNotifier<void> {
 
     // Save brief to Firestore.
     final briefRepo = ref.read(briefRepositoryProvider);
+    final today = todayId();
     final brief = DailyBrief(
       summary: result.brief,
       gapCount: gapsWithTrends.length,
       gaps: gapsWithTrends,
     );
-    debugPrint('[Radar] Saving brief for ${_todayId()} with ${gapsWithTrends.length} gaps');
-    await briefRepo.saveBrief(user.uid, _todayId(), brief);
+    debugPrint('[Radar] Saving brief for $today with ${gapsWithTrends.length} gaps');
+    await briefRepo.saveBrief(user.uid, today, brief);
     debugPrint('[Radar] Brief saved!');
 
     // Save weekly skill gaps.
