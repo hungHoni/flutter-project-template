@@ -115,11 +115,14 @@ class RssService {
         if (item == null) continue;
         if (item['type'] != 'story' || item['url'] == null) continue;
 
+        final hnTitle = item['title'] as String? ?? '';
+        final hnScore = item['score'] as int? ?? 0;
+        final hnDescendants = item['descendants'] as int? ?? 0;
         articles.add(Article(
           source: 'hn',
           sourceName: 'Hacker News',
-          title: item['title'] as String? ?? '',
-          excerpt: item['title'] as String? ?? '',
+          title: hnTitle,
+          excerpt: '$hnScore points · $hnDescendants comments',
           url: item['url'] as String,
           publishedAt: DateTime.fromMillisecondsSinceEpoch(
             ((item['time'] as int?) ?? 0) * 1000,
