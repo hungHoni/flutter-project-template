@@ -38,6 +38,7 @@ GoRouter createRouter(bool onboardingCompleted) {
         routes: [
           GoRoute(
             path: '/radar',
+            name: 'radar',
             pageBuilder: (context, state) => _fadePage(
               key: state.pageKey,
               child: const RadarScreen(),
@@ -45,6 +46,7 @@ GoRouter createRouter(bool onboardingCompleted) {
           ),
           GoRoute(
             path: '/feed',
+            name: 'feed',
             pageBuilder: (context, state) => _fadePage(
               key: state.pageKey,
               child: const FeedScreen(),
@@ -52,6 +54,7 @@ GoRouter createRouter(bool onboardingCompleted) {
           ),
           GoRoute(
             path: '/profile',
+            name: 'profile',
             pageBuilder: (context, state) => _fadePage(
               key: state.pageKey,
               child: const ProfileScreen(),
@@ -82,6 +85,8 @@ class _ScaffoldWithNav extends StatelessWidget {
 
   final Widget child;
 
+  static const _tabRoutes = ['radar', 'feed', 'profile'];
+
   int _currentIndex(BuildContext context) {
     final location = GoRouterState.of(context).uri.path;
     if (location.startsWith('/feed')) return 1;
@@ -100,16 +105,7 @@ class _ScaffoldWithNav extends StatelessWidget {
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _currentIndex(context),
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              context.go('/radar');
-            case 1:
-              context.go('/feed');
-            case 2:
-              context.go('/profile');
-          }
-        },
+        onTap: (index) => context.goNamed(_tabRoutes[index]),
       ),
     );
   }
