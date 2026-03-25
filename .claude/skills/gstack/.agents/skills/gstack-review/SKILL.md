@@ -12,20 +12,28 @@ description: |
 ## Preamble (run first)
 
 ```bash
-_UPD=$(~/.codex/skills/gstack/bin/gstack-update-check 2>/dev/null || .agents/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
+_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+GSTACK_ROOT="$HOME/.codex/skills/gstack"
+[ -n "$_ROOT" ] && [ -d "$_ROOT/.agents/skills/gstack" ] && GSTACK_ROOT="$_ROOT/.agents/skills/gstack"
+GSTACK_BIN="$GSTACK_ROOT/bin"
+GSTACK_BROWSE="$GSTACK_ROOT/browse/dist"
+_UPD=$($GSTACK_BIN/gstack-update-check 2>/dev/null || .agents/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
-_CONTRIB=$(~/.codex/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_PROACTIVE=$(~/.codex/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
+_CONTRIB=$($GSTACK_BIN/gstack-config get gstack_contributor 2>/dev/null || true)
+_PROACTIVE=$($GSTACK_BIN/gstack-config get proactive 2>/dev/null || echo "true")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
 echo "PROACTIVE: $_PROACTIVE"
+source <($GSTACK_BIN/gstack-repo-mode 2>/dev/null) || true
+REPO_MODE=${REPO_MODE:-unknown}
+echo "REPO_MODE: $REPO_MODE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-_TEL=$(~/.codex/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
+_TEL=$($GSTACK_BIN/gstack-config get telemetry 2>/dev/null || true)
 _TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
 _TEL_START=$(date +%s)
 _SESSION_ID="$$-$(date +%s)"
@@ -33,13 +41,14 @@ echo "TELEMETRY: ${_TEL:-off}"
 echo "TEL_PROMPTED: $_TEL_PROMPTED"
 mkdir -p ~/.gstack/analytics
 echo '{"skill":"review","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
-for _PF in ~/.gstack/analytics/.pending-*; do [ -f "$_PF" ] && ~/.codex/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
+# zsh-compatible: use find instead of glob to avoid NOMATCH error
+for _PF in $(find ~/.gstack/analytics -maxdepth 1 -name '.pending-*' 2>/dev/null); do [ -f "$_PF" ] && $GSTACK_BIN/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
 
 If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
 them when the user explicitly asks. The user opted out of proactive suggestions.
 
-If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.codex/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+If output shows `UPGRADE_AVAILABLE <old> <new>`: read `$GSTACK_ROOT/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
 If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
 Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
@@ -65,7 +74,7 @@ Options:
 - A) Help gstack get better! (recommended)
 - B) No thanks
 
-If A: run `~/.codex/skills/gstack/bin/gstack-config set telemetry community`
+If A: run `$GSTACK_BIN/gstack-config set telemetry community`
 
 If B: ask a follow-up AskUserQuestion:
 
@@ -76,8 +85,8 @@ Options:
 - A) Sure, anonymous is fine
 - B) No thanks, fully off
 
-If B→A: run `~/.codex/skills/gstack/bin/gstack-config set telemetry anonymous`
-If B→B: run `~/.codex/skills/gstack/bin/gstack-config set telemetry off`
+If B→A: run `$GSTACK_BIN/gstack-config set telemetry anonymous`
+If B→B: run `$GSTACK_BIN/gstack-config set telemetry off`
 
 Always run:
 ```bash
@@ -93,6 +102,7 @@ This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
 2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
 3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
 4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
+5. **One decision per question:** NEVER combine multiple independent decisions into a single AskUserQuestion. Each decision gets its own call with its own recommendation and focused options. Batching multiple AskUserQuestion calls in rapid succession is fine and often preferred. Only after all individual taste decisions are resolved should a final "Approve / Revise / Reject" gate be presented.
 
 Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
 
@@ -122,6 +132,38 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 - BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
 - BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
 - BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+
+## Repo Ownership Mode — See Something, Say Something
+
+`REPO_MODE` from the preamble tells you who owns issues in this repo:
+
+- **`solo`** — One person does 80%+ of the work. They own everything. When you notice issues outside the current branch's changes (test failures, deprecation warnings, security advisories, linting errors, dead code, env problems), **investigate and offer to fix proactively**. The solo dev is the only person who will fix it. Default to action.
+- **`collaborative`** — Multiple active contributors. When you notice issues outside the branch's changes, **flag them via AskUserQuestion** — it may be someone else's responsibility. Default to asking, not fixing.
+- **`unknown`** — Treat as collaborative (safer default — ask before fixing).
+
+**See Something, Say Something:** Whenever you notice something that looks wrong during ANY workflow step — not just test failures — flag it briefly. One sentence: what you noticed and its impact. In solo mode, follow up with "Want me to fix it?" In collaborative mode, just flag it and move on.
+
+Never let a noticed issue silently pass. The whole point is proactive communication.
+
+## Search Before Building
+
+Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `$GSTACK_ROOT/ETHOS.md` for the full philosophy.
+
+**Three layers of knowledge:**
+- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
+- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
+- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
+
+**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
+"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
+
+Log eureka moments:
+```bash
+jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
+```
+Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
+
+**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
 
 ## Contributor Mode
 
@@ -203,7 +245,7 @@ Run this bash:
 _TEL_END=$(date +%s)
 _TEL_DUR=$(( _TEL_END - _TEL_START ))
 rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
-~/.codex/skills/gstack/bin/gstack-telemetry-log \
+$GSTACK_ROOT/bin/gstack-telemetry-log \
   --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
   --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
 ```
@@ -212,6 +254,42 @@ Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
 success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
 If you cannot determine the outcome, use "unknown". This runs in the background and
 never blocks the user.
+
+## Plan Status Footer
+
+When you are in plan mode and about to call ExitPlanMode:
+
+1. Check if the plan file already has a `## GSTACK REVIEW REPORT` section.
+2. If it DOES — skip (a review skill already wrote a richer report).
+3. If it does NOT — run this command:
+
+\`\`\`bash
+$GSTACK_ROOT/bin/gstack-review-read
+\`\`\`
+
+Then write a `## GSTACK REVIEW REPORT` section to the end of the plan file:
+
+- If the output contains review entries (JSONL lines before `---CONFIG---`): format the
+  standard report table with runs/status/findings per skill, same format as the review
+  skills use.
+- If the output is `NO_REVIEWS` or empty: write this placeholder table:
+
+\`\`\`markdown
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | \`/plan-ceo-review\` | Scope & strategy | 0 | — | — |
+| Codex Review | \`/codex review\` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | \`/plan-eng-review\` | Architecture & tests (required) | 0 | — | — |
+| Design Review | \`/plan-design-review\` | UI/UX gaps | 0 | — | — |
+
+**VERDICT:** NO REVIEWS YET — run \`/autoplan\` for full review pipeline, or individual reviews above.
+\`\`\`
+
+**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
+file you are allowed to edit in plan mode. The plan file review report is part of the
+plan's living status.
 
 ## Step 0: Detect base branch
 
@@ -254,8 +332,121 @@ Before reviewing code quality, check: **did they build what was requested — no
    Read commit messages (`git log origin/<base>..HEAD --oneline`).
    **If no PR exists:** rely on commit messages and TODOS.md for stated intent — this is the common case since /review runs before /ship creates the PR.
 2. Identify the **stated intent** — what was this branch supposed to accomplish?
-3. Run `git diff origin/<base> --stat` and compare the files changed against the stated intent.
-4. Evaluate with skepticism:
+3. Run `git diff origin/<base>...HEAD --stat` and compare the files changed against the stated intent.
+
+### Plan File Discovery
+
+1. **Conversation context (primary):** Check if there is an active plan file in this conversation — Claude Code system messages include plan file paths when in plan mode. Look for references like `~/.claude/plans/*.md` in system messages. If found, use it directly — this is the most reliable signal.
+
+2. **Content-based search (fallback):** If no plan file is referenced in conversation context, search by content:
+
+```bash
+BRANCH=$(git branch --show-current 2>/dev/null | tr '/' '-')
+REPO=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)")
+# Try branch name match first (most specific)
+PLAN=$(ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$BRANCH" 2>/dev/null | head -1)
+# Fall back to repo name match
+[ -z "$PLAN" ] && PLAN=$(ls -t ~/.claude/plans/*.md 2>/dev/null | xargs grep -l "$REPO" 2>/dev/null | head -1)
+# Last resort: most recent plan modified in the last 24 hours
+[ -z "$PLAN" ] && PLAN=$(find ~/.claude/plans -name '*.md' -mmin -1440 -maxdepth 1 2>/dev/null | xargs ls -t 2>/dev/null | head -1)
+[ -n "$PLAN" ] && echo "PLAN_FILE: $PLAN" || echo "NO_PLAN_FILE"
+```
+
+3. **Validation:** If a plan file was found via content-based search (not conversation context), read the first 20 lines and verify it is relevant to the current branch's work. If it appears to be from a different project or feature, treat as "no plan file found."
+
+**Error handling:**
+- No plan file found → skip with "No plan file detected — skipping."
+- Plan file found but unreadable (permissions, encoding) → skip with "Plan file found but unreadable — skipping."
+
+### Actionable Item Extraction
+
+Read the plan file. Extract every actionable item — anything that describes work to be done. Look for:
+
+- **Checkbox items:** `- [ ] ...` or `- [x] ...`
+- **Numbered steps** under implementation headings: "1. Create ...", "2. Add ...", "3. Modify ..."
+- **Imperative statements:** "Add X to Y", "Create a Z service", "Modify the W controller"
+- **File-level specifications:** "New file: path/to/file.ts", "Modify path/to/existing.rb"
+- **Test requirements:** "Test that X", "Add test for Y", "Verify Z"
+- **Data model changes:** "Add column X to table Y", "Create migration for Z"
+
+**Ignore:**
+- Context/Background sections (`## Context`, `## Background`, `## Problem`)
+- Questions and open items (marked with ?, "TBD", "TODO: decide")
+- Review report sections (`## GSTACK REVIEW REPORT`)
+- Explicitly deferred items ("Future:", "Out of scope:", "NOT in scope:", "P2:", "P3:", "P4:")
+- CEO Review Decisions sections (these record choices, not work items)
+
+**Cap:** Extract at most 50 items. If the plan has more, note: "Showing top 50 of N plan items — full list in plan file."
+
+**No items found:** If the plan contains no extractable actionable items, skip with: "Plan file contains no actionable items — skipping completion audit."
+
+For each item, note:
+- The item text (verbatim or concise summary)
+- Its category: CODE | TEST | MIGRATION | CONFIG | DOCS
+
+### Cross-Reference Against Diff
+
+Run `git diff origin/<base>...HEAD` and `git log origin/<base>..HEAD --oneline` to understand what was implemented.
+
+For each extracted plan item, check the diff and classify:
+
+- **DONE** — Clear evidence in the diff that this item was implemented. Cite the specific file(s) changed.
+- **PARTIAL** — Some work toward this item exists in the diff but it's incomplete (e.g., model created but controller missing, function exists but edge cases not handled).
+- **NOT DONE** — No evidence in the diff that this item was addressed.
+- **CHANGED** — The item was implemented using a different approach than the plan described, but the same goal is achieved. Note the difference.
+
+**Be conservative with DONE** — require clear evidence in the diff. A file being touched is not enough; the specific functionality described must be present.
+**Be generous with CHANGED** — if the goal is met by different means, that counts as addressed.
+
+### Output Format
+
+```
+PLAN COMPLETION AUDIT
+═══════════════════════════════
+Plan: {plan file path}
+
+## Implementation Items
+  [DONE]      Create UserService — src/services/user_service.rb (+142 lines)
+  [PARTIAL]   Add validation — model validates but missing controller checks
+  [NOT DONE]  Add caching layer — no cache-related changes in diff
+  [CHANGED]   "Redis queue" → implemented with Sidekiq instead
+
+## Test Items
+  [DONE]      Unit tests for UserService — test/services/user_service_test.rb
+  [NOT DONE]  E2E test for signup flow
+
+## Migration Items
+  [DONE]      Create users table — db/migrate/20240315_create_users.rb
+
+─────────────────────────────────
+COMPLETION: 4/7 DONE, 1 PARTIAL, 1 NOT DONE, 1 CHANGED
+─────────────────────────────────
+```
+
+### Integration with Scope Drift Detection
+
+The plan completion results augment the existing Scope Drift Detection. If a plan file is found:
+
+- **NOT DONE items** become additional evidence for **MISSING REQUIREMENTS** in the scope drift report.
+- **Items in the diff that don't match any plan item** become evidence for **SCOPE CREEP** detection.
+
+This is **INFORMATIONAL** — does not block the review (consistent with existing scope drift behavior).
+
+Update the scope drift output to include plan file context:
+
+```
+Scope Check: [CLEAN / DRIFT DETECTED / REQUIREMENTS MISSING]
+Intent: <from plan file — 1-line summary>
+Plan: <plan file path>
+Delivered: <1-line summary of what the diff actually does>
+Plan items: N DONE, M PARTIAL, K NOT DONE
+[If NOT DONE: list each missing item]
+[If scope creep: list each out-of-scope change not in the plan]
+```
+
+**No plan file found:** Fall back to existing scope drift behavior (check TODOS.md and PR description only).
+
+4. Evaluate with skepticism (incorporating plan completion results if available):
 
    **SCOPE CREEP detection:**
    - Files changed that are unrelated to the stated intent
@@ -315,9 +506,16 @@ Run `git diff origin/<base>` to get the full diff. This includes both committed 
 Apply the checklist against the diff in two passes:
 
 1. **Pass 1 (CRITICAL):** SQL & Data Safety, Race Conditions & Concurrency, LLM Output Trust Boundary, Enum & Value Completeness
-2. **Pass 2 (INFORMATIONAL):** Conditional Side Effects, Magic Numbers & String Coupling, Dead Code & Consistency, LLM Prompt Issues, Test Gaps, View/Frontend
+2. **Pass 2 (INFORMATIONAL):** Conditional Side Effects, Magic Numbers & String Coupling, Dead Code & Consistency, LLM Prompt Issues, Test Gaps, View/Frontend, Performance & Bundle Impact
 
 **Enum & Value Completeness requires reading code OUTSIDE the diff.** When the diff introduces a new enum value, status, tier, or type constant, use Grep to find all files that reference sibling values, then Read those files to check if the new value is handled. This is the one category where within-diff review is insufficient.
+
+**Search-before-recommending:** When recommending a fix pattern (especially for concurrency, caching, auth, or framework-specific behavior):
+- Verify the pattern is current best practice for the framework version in use
+- Check if a built-in solution exists in newer versions before recommending a workaround
+- Verify API signatures against current docs (APIs change between versions)
+
+Takes seconds, prevents recommending outdated patterns. If WebSearch is unavailable, note it and proceed with in-distribution knowledge.
 
 Follow the output format specified in the checklist. Respect the suppressions — do NOT flag items listed in the "DO NOT flag" section.
 
@@ -330,7 +528,7 @@ Follow the output format specified in the checklist. Respect the suppressions �
 Check if the diff touches frontend files using `gstack-diff-scope`:
 
 ```bash
-source <(~/.codex/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
+source <($GSTACK_BIN/gstack-diff-scope <base> 2>/dev/null)
 ```
 
 **If `SCOPE_FRONTEND=false`:** Skip design review silently. No output.
@@ -353,12 +551,189 @@ source <(~/.codex/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
 6. **Log the result** for the Review Readiness Dashboard:
 
 ```bash
-~/.codex/skills/gstack/bin/gstack-review-log '{"skill":"design-review-lite","timestamp":"TIMESTAMP","status":"STATUS","findings":N,"auto_fixed":M,"commit":"COMMIT"}'
+$GSTACK_BIN/gstack-review-log '{"skill":"design-review-lite","timestamp":"TIMESTAMP","status":"STATUS","findings":N,"auto_fixed":M,"commit":"COMMIT"}'
 ```
 
 Substitute: TIMESTAMP = ISO 8601 datetime, STATUS = "clean" if 0 findings or "issues_found", N = total findings, M = auto-fixed count, COMMIT = output of `git rev-parse --short HEAD`.
 
 Include any design findings alongside the findings from Step 4. They follow the same Fix-First flow in Step 5 — AUTO-FIX for mechanical CSS fixes, ASK for everything else.
+
+---
+
+## Step 4.75: Test Coverage Diagram
+
+100% coverage is the goal. Evaluate every codepath changed in the diff and identify test gaps. Gaps become INFORMATIONAL findings that follow the Fix-First flow.
+
+### Test Framework Detection
+
+Before analyzing coverage, detect the project's test framework:
+
+1. **Read CLAUDE.md** — look for a `## Testing` section with test command and framework name. If found, use that as the authoritative source.
+2. **If CLAUDE.md has no testing section, auto-detect:**
+
+```bash
+# Detect project runtime
+[ -f Gemfile ] && echo "RUNTIME:ruby"
+[ -f package.json ] && echo "RUNTIME:node"
+[ -f requirements.txt ] || [ -f pyproject.toml ] && echo "RUNTIME:python"
+[ -f go.mod ] && echo "RUNTIME:go"
+[ -f Cargo.toml ] && echo "RUNTIME:rust"
+# Check for existing test infrastructure
+ls jest.config.* vitest.config.* playwright.config.* cypress.config.* .rspec pytest.ini phpunit.xml 2>/dev/null
+ls -d test/ tests/ spec/ __tests__/ cypress/ e2e/ 2>/dev/null
+```
+
+3. **If no framework detected:** still produce the coverage diagram, but skip test generation.
+
+**Step 1. Trace every codepath changed** using `git diff origin/<base>...HEAD`:
+
+Read every changed file. For each one, trace how data flows through the code — don't just list functions, actually follow the execution:
+
+1. **Read the diff.** For each changed file, read the full file (not just the diff hunk) to understand context.
+2. **Trace data flow.** Starting from each entry point (route handler, exported function, event listener, component render), follow the data through every branch:
+   - Where does input come from? (request params, props, database, API call)
+   - What transforms it? (validation, mapping, computation)
+   - Where does it go? (database write, API response, rendered output, side effect)
+   - What can go wrong at each step? (null/undefined, invalid input, network failure, empty collection)
+3. **Diagram the execution.** For each changed file, draw an ASCII diagram showing:
+   - Every function/method that was added or modified
+   - Every conditional branch (if/else, switch, ternary, guard clause, early return)
+   - Every error path (try/catch, rescue, error boundary, fallback)
+   - Every call to another function (trace into it — does IT have untested branches?)
+   - Every edge: what happens with null input? Empty array? Invalid type?
+
+This is the critical step — you're building a map of every line of code that can execute differently based on input. Every branch in this diagram needs a test.
+
+**Step 2. Map user flows, interactions, and error states:**
+
+Code coverage isn't enough — you need to cover how real users interact with the changed code. For each changed feature, think through:
+
+- **User flows:** What sequence of actions does a user take that touches this code? Map the full journey (e.g., "user clicks 'Pay' → form validates → API call → success/failure screen"). Each step in the journey needs a test.
+- **Interaction edge cases:** What happens when the user does something unexpected?
+  - Double-click/rapid resubmit
+  - Navigate away mid-operation (back button, close tab, click another link)
+  - Submit with stale data (page sat open for 30 minutes, session expired)
+  - Slow connection (API takes 10 seconds — what does the user see?)
+  - Concurrent actions (two tabs, same form)
+- **Error states the user can see:** For every error the code handles, what does the user actually experience?
+  - Is there a clear error message or a silent failure?
+  - Can the user recover (retry, go back, fix input) or are they stuck?
+  - What happens with no network? With a 500 from the API? With invalid data from the server?
+- **Empty/zero/boundary states:** What does the UI show with zero results? With 10,000 results? With a single character input? With maximum-length input?
+
+Add these to your diagram alongside the code branches. A user flow with no test is just as much a gap as an untested if/else.
+
+**Step 3. Check each branch against existing tests:**
+
+Go through your diagram branch by branch — both code paths AND user flows. For each one, search for a test that exercises it:
+- Function `processPayment()` → look for `billing.test.ts`, `billing.spec.ts`, `test/billing_test.rb`
+- An if/else → look for tests covering BOTH the true AND false path
+- An error handler → look for a test that triggers that specific error condition
+- A call to `helperFn()` that has its own branches → those branches need tests too
+- A user flow → look for an integration or E2E test that walks through the journey
+- An interaction edge case → look for a test that simulates the unexpected action
+
+Quality scoring rubric:
+- ★★★  Tests behavior with edge cases AND error paths
+- ★★   Tests correct behavior, happy path only
+- ★    Smoke test / existence check / trivial assertion (e.g., "it renders", "it doesn't throw")
+
+### E2E Test Decision Matrix
+
+When checking each branch, also determine whether a unit test or E2E/integration test is the right tool:
+
+**RECOMMEND E2E (mark as [→E2E] in the diagram):**
+- Common user flow spanning 3+ components/services (e.g., signup → verify email → first login)
+- Integration point where mocking hides real failures (e.g., API → queue → worker → DB)
+- Auth/payment/data-destruction flows — too important to trust unit tests alone
+
+**RECOMMEND EVAL (mark as [→EVAL] in the diagram):**
+- Critical LLM call that needs a quality eval (e.g., prompt change → test output still meets quality bar)
+- Changes to prompt templates, system instructions, or tool definitions
+
+**STICK WITH UNIT TESTS:**
+- Pure function with clear inputs/outputs
+- Internal helper with no side effects
+- Edge case of a single function (null input, empty array)
+- Obscure/rare flow that isn't customer-facing
+
+### REGRESSION RULE (mandatory)
+
+**IRON RULE:** When the coverage audit identifies a REGRESSION — code that previously worked but the diff broke — a regression test is written immediately. No AskUserQuestion. No skipping. Regressions are the highest-priority test because they prove something broke.
+
+A regression is when:
+- The diff modifies existing behavior (not new code)
+- The existing test suite (if any) doesn't cover the changed path
+- The change introduces a new failure mode for existing callers
+
+When uncertain whether a change is a regression, err on the side of writing the test.
+
+Format: commit as `test: regression test for {what broke}`
+
+**Step 4. Output ASCII coverage diagram:**
+
+Include BOTH code paths and user flows in the same diagram. Mark E2E-worthy and eval-worthy paths:
+
+```
+CODE PATH COVERAGE
+===========================
+[+] src/services/billing.ts
+    │
+    ├── processPayment()
+    │   ├── [★★★ TESTED] Happy path + card declined + timeout — billing.test.ts:42
+    │   ├── [GAP]         Network timeout — NO TEST
+    │   └── [GAP]         Invalid currency — NO TEST
+    │
+    └── refundPayment()
+        ├── [★★  TESTED] Full refund — billing.test.ts:89
+        └── [★   TESTED] Partial refund (checks non-throw only) — billing.test.ts:101
+
+USER FLOW COVERAGE
+===========================
+[+] Payment checkout flow
+    │
+    ├── [★★★ TESTED] Complete purchase — checkout.e2e.ts:15
+    ├── [GAP] [→E2E] Double-click submit — needs E2E, not just unit
+    ├── [GAP]         Navigate away during payment — unit test sufficient
+    └── [★   TESTED]  Form validation errors (checks render only) — checkout.test.ts:40
+
+[+] Error states
+    │
+    ├── [★★  TESTED] Card declined message — billing.test.ts:58
+    ├── [GAP]         Network timeout UX (what does user see?) — NO TEST
+    └── [GAP]         Empty cart submission — NO TEST
+
+[+] LLM integration
+    │
+    └── [GAP] [→EVAL] Prompt template change — needs eval test
+
+─────────────────────────────────
+COVERAGE: 5/13 paths tested (38%)
+  Code paths: 3/5 (60%)
+  User flows: 2/8 (25%)
+QUALITY:  ★★★: 2  ★★: 2  ★: 1
+GAPS: 8 paths need tests (2 need E2E, 1 needs eval)
+─────────────────────────────────
+```
+
+**Fast path:** All paths covered → "Step 4.75: All new code paths have test coverage ✓" Continue.
+
+**Step 5. Generate tests for gaps (Fix-First):**
+
+If test framework is detected and gaps were identified:
+- Classify each gap as AUTO-FIX or ASK per the Fix-First Heuristic:
+  - **AUTO-FIX:** Simple unit tests for pure functions, edge cases of existing tested functions
+  - **ASK:** E2E tests, tests requiring new test infrastructure, tests for ambiguous behavior
+- For AUTO-FIX gaps: generate the test, run it, commit as `test: coverage for {feature}`
+- For ASK gaps: include in the Fix-First batch question with the other review findings
+- For paths marked [→E2E]: always ASK (E2E tests are higher-effort and need user confirmation)
+- For paths marked [→EVAL]: always ASK (eval tests need user confirmation on quality criteria)
+
+If no test framework detected → include gaps as INFORMATIONAL findings only, no generation.
+
+**Diff is test-only changes:** Skip Step 4.75 entirely: "No new application code paths to audit."
+
+This step subsumes the "Test Gaps" category from Pass 2 — do not duplicate findings between the checklist Test Gaps item and this coverage diagram. Include any coverage gaps alongside the findings from Step 4 and Step 4.5. They follow the same Fix-First flow — gaps are INFORMATIONAL findings.
 
 ---
 
@@ -475,6 +850,27 @@ If no documentation files exist, skip this step silently.
 ---
 
 
+
+## Step 5.8: Persist Eng Review result
+
+After all review passes complete, persist the final `/review` outcome so `/ship` can
+recognize that Eng Review was run on this branch.
+
+Run:
+
+```bash
+$GSTACK_ROOT/bin/gstack-review-log '{"skill":"review","timestamp":"TIMESTAMP","status":"STATUS","issues_found":N,"critical":N,"informational":N,"commit":"COMMIT"}'
+```
+
+Substitute:
+- `TIMESTAMP` = ISO 8601 datetime
+- `STATUS` = `"clean"` if there are no remaining unresolved findings after Fix-First handling and adversarial review, otherwise `"issues_found"`
+- `issues_found` = total remaining unresolved findings
+- `critical` = remaining unresolved critical findings
+- `informational` = remaining unresolved informational findings
+- `COMMIT` = output of `git rev-parse --short HEAD`
+
+If the review exits early before a real review completes (for example, no diff against the base branch), do **not** write this entry.
 
 ## Important Rules
 
