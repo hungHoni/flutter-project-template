@@ -148,12 +148,7 @@ class _ArticleStreamList extends ConsumerWidget {
           onRefresh: () async {
             HapticFeedback.mediumImpact();
             final notifier = ref.read(feedSyncNotifierProvider.notifier);
-            await notifier.refresh(const [
-              'r/MachineLearning',
-              'r/LocalLLaMA',
-              'Hacker News',
-              'AI Blogs',
-            ]);
+            await notifier.refresh();
           },
           child: ListView.separated(
             padding: const EdgeInsets.all(AppSpacing.lg),

@@ -82,10 +82,7 @@ class ClaudeService {
     required Map<String, String> articleIdMap,
   }) async {
     if (_apiKey.isEmpty) {
-      throw Exception(
-        'ANTHROPIC_API_KEY not set. Run with: '
-        'flutter run --dart-define=ANTHROPIC_API_KEY=sk-ant-...',
-      );
+      throw Exception('ANTHROPIC_API_KEY not configured.');
     }
 
     if (articles.isEmpty) {
@@ -142,14 +139,14 @@ $articlesText
     return _parseResponse(text);
   }
 
+  static final _fencePattern = RegExp(r'^```\w*\n([\s\S]*?)```$');
+
   ClaudeAnalysisResult _parseResponse(String text) {
     // Strip markdown code fences if present.
     var cleaned = text.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(cleaned.indexOf('\n') + 1);
-      if (cleaned.endsWith('```')) {
-        cleaned = cleaned.substring(0, cleaned.lastIndexOf('```'));
-      }
+    final fenceMatch = _fencePattern.firstMatch(cleaned);
+    if (fenceMatch != null) {
+      cleaned = fenceMatch.group(1)!;
     }
 
     final json = jsonDecode(cleaned.trim()) as Map<String, dynamic>;

@@ -326,6 +326,7 @@ class _TrendBadge extends StatelessWidget {
       'hot' => (AppIcons.trendHot, 'HOT', AppColors.trending),
       'rising' => (AppIcons.trendUp, 'RISING', AppColors.trending),
       'new' => (AppIcons.trendNew, 'NEW', AppColors.primary),
+      'stable' => (AppIcons.trendStable, 'STABLE', AppColors.textMeta),
       _ => (AppIcons.trendNew, 'NEW', AppColors.primary),
     };
 
