@@ -26,8 +26,9 @@ class UserProfileRepository {
   }
 
   /// Updates a single field on the profile.
+  /// Uses set+merge so it works even if the document doesn't exist yet.
   Future<void> updateField(String uid, String field, dynamic value) {
-    return _doc(uid).update({field: value});
+    return _doc(uid).set({field: value}, SetOptions(merge: true));
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../app/providers/auth_provider.dart';
 import '../../../features/onboarding/models/onboarding_state.dart';
+import '../../../models/user_profile.dart';
 import '../../../shared/widgets/scroll_entry.dart';
 import '../../../shared/widgets/selectable_chip.dart';
 import '../../../shared/widgets/skeleton_card.dart';
@@ -98,7 +99,7 @@ class ProfileScreen extends ConsumerWidget {
                             label: r,
                             isSelected: role == r,
                             onTap: () =>
-                                _updateField(ref, uid, 'role', r),
+                                _updateField(ref, uid, 'role', r, currentProfile: profile),
                           );
                         }).toList(),
                       ),
@@ -124,7 +125,7 @@ class ProfileScreen extends ConsumerWidget {
                             label: l,
                             isSelected: level == l,
                             onTap: () =>
-                                _updateField(ref, uid, 'level', l),
+                                _updateField(ref, uid, 'level', l, currentProfile: profile),
                           );
                         }).toList(),
                       ),
@@ -159,7 +160,7 @@ class ProfileScreen extends ConsumerWidget {
                               } else {
                                 updated.add(skill);
                               }
-                              _updateField(ref, uid, 'skills', updated);
+                              _updateField(ref, uid, 'skills', updated, currentProfile: profile);
                             },
                           );
                         }).toList(),
@@ -202,7 +203,7 @@ class ProfileScreen extends ConsumerWidget {
                                     updated.add(name);
                                   }
                                   _updateField(
-                                      ref, uid, 'feedSources', updated);
+                                      ref, uid, 'feedSources', updated, currentProfile: profile);
                                 },
                               ),
                               if (i < availableSources.length - 1)
@@ -268,9 +269,34 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _updateField(WidgetRef ref, String? uid, String field, dynamic value) {
+  void _updateField(
+    WidgetRef ref,
+    String? uid,
+    String field,
+    dynamic value, {
+    required UserProfile? currentProfile,
+  }) {
     if (uid == null) return;
-    ref.read(userProfileRepositoryProvider).updateField(uid, field, value);
+    final repo = ref.read(userProfileRepositoryProvider);
+
+    if (currentProfile == null) {
+      // No profile document exists — create a full one with the updated field.
+      final defaults = UserProfile(
+        role: 'Software Engineer',
+        skills: const [],
+        level: 'Intermediate',
+        feedSources: availableSources
+            .where((s) => s.defaultEnabled)
+            .map((s) => s.name)
+            .toList(),
+        createdAt: DateTime.now(),
+      );
+      final json = defaults.toJson();
+      json[field] = value;
+      repo.saveProfile(uid, UserProfile.fromJson(json));
+    } else {
+      repo.updateField(uid, field, value);
+    }
   }
 }
 
