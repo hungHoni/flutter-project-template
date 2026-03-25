@@ -45,6 +45,15 @@ class ArticleRepository {
     final doc = await _collection.doc(id).get();
     return doc.exists;
   }
+
+  /// Batch-updates `isSkillGap: true` on the given article IDs.
+  Future<void> tagArticlesAsSkillGap(List<String> articleIds) async {
+    final batch = _firestore.batch();
+    for (final id in articleIds) {
+      batch.update(_collection.doc(id), {'isSkillGap': true});
+    }
+    await batch.commit();
+  }
 }
 
 /// Provides the ArticleRepository.

@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AI Skill Radar",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "--dart-define=ANTHROPIC_API_KEY=YOUR_ANTHROPIC_API_KEY"
+      ]
+    }
+  ]
+}

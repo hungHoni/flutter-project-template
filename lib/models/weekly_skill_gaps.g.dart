@@ -18,4 +18,4 @@ _$WeeklySkillGapsImpl _$$WeeklySkillGapsImplFromJson(
 
 Map<String, dynamic> _$$WeeklySkillGapsImplToJson(
   _$WeeklySkillGapsImpl instance,
-) => <String, dynamic>{'gaps': instance.gaps};
+) => <String, dynamic>{'gaps': instance.gaps.map((e) => e.toJson()).toList()};

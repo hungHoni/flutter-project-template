@@ -1,6 +1,6 @@
-# Handoff: AI Skill Radar — Steps 1-5, 7-9 Complete
+# Handoff: AI Skill Radar — Steps 1-6, 7-9 Complete
 
-**Date:** 2026-03-21
+**Date:** 2026-03-25
 **Branch:** main
 
 ## Goal
@@ -51,7 +51,7 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
   - Barrel export at `lib/models/models.dart`
 - [x] **Step 5: RSS feed ingestion** — client-side implementation (no Blaze required):
   - **Firestore provider** — `firestoreProvider` exposing FirebaseFirestore instance
-  - **ArticleRepository** — Firestore CRUD for `articles/{id}` with SHA-256 URL hashing, watchArticles stream, upsert, exists check
+  - **ArticleRepository** — Firestore CRUD for `articles/{id}` with SHA-256 URL hashing, watchArticles stream, upsert, exists check, tagArticlesAsSkillGap batch update
   - **RssService** — Client-side RSS/Atom fetcher via `dio` + `xml`:
     - Reddit: fetches `/r/{sub}/hot.rss` Atom XML with User-Agent header, 60min rate limit
     - Hacker News: fetches top stories via JSON API (topstories + item endpoints)
@@ -67,24 +67,53 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
   - **Profile screen wired to Firestore** — ConsumerWidget watching userProfileProvider, writes changes via updateField
   - **Onboarding writes to Firestore** — completeOnboarding() creates UserProfile in Firestore
   - Added `xml: ^6.5.0` and `crypto: ^3.0.0` dependencies
-- [x] **Step 7: Radar dashboard** — full screen with mock data:
+- [x] **Step 6: Claude API integration** — client-side implementation (no Blaze required):
+  - **ClaudeService** — Calls Claude Haiku 4.5 via `anthropic_sdk_dart` package:
+    - System prompt from design doc: role + skills + articles → JSON brief + gaps + tagged_articles
+    - JSON response parsing with markdown code fence stripping
+    - API key via `--dart-define=ANTHROPIC_API_KEY=xxx` (not hardcoded)
+    - Graceful error handling (empty articles, invalid JSON, API errors)
+  - **BriefRepository** — Firestore CRUD for `users/{uid}/briefs/{date}`:
+    - `saveBrief` writes to `briefs/{yyyy-MM-dd}`
+    - `watchBrief` streams specific date's brief
+    - `watchLatestBrief` streams most recent brief (fallback)
+  - **SkillGapRepository** — Firestore CRUD for `users/{uid}/skillGaps/{weekId}`:
+    - `saveWeeklyGaps` writes current week's gaps
+    - `watchWeek` streams specific week
+    - `getPreviousWeeks` reads last N weeks for trend computation
+  - **TrendService** — Client-side trend label computation:
+    - Hot = 10+ mentions in current batch
+    - Rising = mentions increased 2x+ vs. last week
+    - New = skill not present in any prior week
+  - **Radar providers** — Full orchestration layer:
+    - `todaysBriefProvider` StreamProvider watching latest brief from Firestore
+    - `RadarRefreshNotifier` orchestrates: read profile → read articles → call Claude → compute trends → save brief + gaps → tag articles
+  - **Radar screen wired to live data** — ConsumerStatefulWidget:
+    - Auto-triggers analysis on first open if no brief exists
+    - Pull-to-refresh triggers new Claude analysis
+    - Loading state: "Scanning the AI landscape for you..."
+    - Empty state: "Your first radar is brewing..." with Generate button
+    - Error state: contextual messages (no API key, no articles, generic)
+    - Cached fallback: "Couldn't refresh. Showing last brief."
+  - Added `anthropic_sdk_dart: ^1.3.2` dependency
+- [x] **Step 7: Radar dashboard** — now wired to live Claude API data:
   - "Your Radar" serif headline with formatted date subtitle
-  - TODAY'S BRIEF card, gap cards with HOT/RISING/NEW trend badges
-  - 5 mock skill gaps (Radar keeps mock data until Step 6 Claude API)
-- [x] **Step 8: Feed screen** — now wired to live Firestore data:
+  - TODAY'S BRIEF card with AI-generated personalized summary
+  - Gap cards with HOT/RISING/NEW trend badges (computed from Firestore history)
+  - Suggested actions per gap
+- [x] **Step 8: Feed screen** — wired to live Firestore data:
   - Tabbed articles (All/Reddit/HN/Blogs) from Firestore streams
   - Pull-to-refresh triggers RSS sync
   - Loading/error/empty states
-- [x] **Step 9: Profile screen** — now wired to live Firestore data:
+- [x] **Step 9: Profile screen** — wired to live Firestore data:
   - Reads/writes role, skills, level, feedSources to Firestore in real time
   - About section with app info
 
 ## In Progress / Next Steps
 
-- [ ] **Step 6: Claude API integration** — Cloud Function for article summarization + skill extraction *(blocked: requires Firebase Blaze plan for Cloud Functions, or can be done client-side with Claude SDK)*
 - [ ] **Step 10: Push notifications** — FCM for weekly skill brief
 - [ ] **Step 11: Polish** — Animations, error states, empty states, offline mode
-- [ ] **Phase B: Server-side RSS** — When Blaze plan active: move RSS fetching to scheduled Cloud Function, delete client-side `rss_service.dart` + `feed_sync_service.dart`
+- [ ] **Phase B: Server-side RSS + Claude** — When Blaze plan active: move RSS fetching + Claude API to scheduled Cloud Functions, delete client-side `rss_service.dart` + `feed_sync_service.dart` + `claude_service.dart`
 
 ## Key Decisions
 
@@ -100,6 +129,8 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **URL hash as document ID**: `sha256(url).substring(0, 20)` for stable cross-platform dedup
 - **60-minute rate limit per source**: In-memory `Map<String, DateTime>` prevents excessive API calls
 - **Profile uses Riverpod + Firestore**: ConsumerWidget watches `userProfileProvider`, writes changes via `userProfileRepositoryProvider`
+- **Client-side Claude API**: Uses `anthropic_sdk_dart` with Haiku 4.5 (~$2/month). API key injected via `--dart-define` at build time. Will move to Cloud Function in Phase B for key security.
+- **Claude Haiku 4.5 model**: `claude-haiku-4-5-20251001` — fast, cheap, sufficient for summarization. ~$0.07/day for 20 articles.
 
 ## Dead Ends (Don't Repeat These)
 
@@ -113,6 +144,16 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **Web blank screen without web config**: firebase_options.dart must include `kIsWeb` check.
 
 ## Files Changed
+
+### Step 6 (Claude API integration)
+- `pubspec.yaml` — Added anthropic_sdk_dart dependency
+- `lib/features/radar/services/claude_service.dart` — NEW: Claude API client, prompt template, JSON parsing
+- `lib/features/radar/repositories/brief_repository.dart` — NEW: Firestore CRUD for daily briefs
+- `lib/features/radar/repositories/skill_gap_repository.dart` — NEW: Firestore CRUD for weekly skill gaps
+- `lib/features/radar/services/trend_service.dart` — NEW: Client-side Hot/Rising/New trend computation
+- `lib/features/radar/providers/radar_providers.dart` — NEW: Orchestration providers (todaysBrief, radarRefresh)
+- `lib/features/radar/screens/radar_screen.dart` — REWRITTEN: ConsumerStatefulWidget with live Firestore data
+- `lib/features/feed/repositories/article_repository.dart` — MODIFIED: Added tagArticlesAsSkillGap batch method
 
 ### Step 5 (RSS feed ingestion + Firestore wiring)
 - `pubspec.yaml` — Added xml, crypto dependencies
@@ -129,9 +170,9 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - `lib/features/onboarding/providers/onboarding_provider.dart` — MODIFIED: Writes UserProfile to Firestore on completion
 
 ### Steps 7-9 (UI screens)
-- `lib/features/radar/screens/radar_screen.dart` — Full radar dashboard with brief card, gap cards, trend badges
-- `lib/features/feed/screens/feed_screen.dart` — Tabbed feed (now Firestore-backed)
-- `lib/features/profile/screens/profile_screen.dart` — Editable settings (now Firestore-backed)
+- `lib/features/radar/screens/radar_screen.dart` — Full radar dashboard (now Claude API-backed)
+- `lib/features/feed/screens/feed_screen.dart` — Tabbed feed (Firestore-backed)
+- `lib/features/profile/screens/profile_screen.dart` — Editable settings (Firestore-backed)
 
 ### Step 4 (Firestore data model)
 - `lib/models/` — All freezed models + generated code
@@ -150,16 +191,23 @@ Build "AI Skill Radar" — a personalized weekly AI skill gap detector as a Flut
 - **Models:** All 5 Firestore document models generated.
 - **Feed:** Live RSS ingestion → Firestore → StreamProvider → UI. Pull-to-refresh supported.
 - **Profile:** Reads/writes to Firestore in real time.
-- **Radar:** Still uses mock data (needs Claude API for DailyBrief generation).
+- **Radar:** Live Claude API analysis → DailyBrief + SkillGaps → Firestore → StreamProvider → UI.
+
+## Run Command
+
+```bash
+flutter run --dart-define=ANTHROPIC_API_KEY=sk-ant-api03-YOUR_KEY_HERE
+```
 
 ## Context for Next Session
 
-Steps 1-5 and 7-9 are complete. The app fetches live RSS articles client-side (Reddit, HN, AI blogs), stores them in Firestore with URL-hash deduplication, and displays them in the Feed screen via Riverpod StreamProviders. The Profile screen reads/writes user preferences to Firestore. Onboarding creates the Firestore user document.
-
-**Radar screen still uses mock data** — it needs DailyBrief + SkillGap data generated by Claude API (Step 6). This can be done client-side with the Anthropic Dart SDK or server-side with Cloud Functions.
+Steps 1-9 are complete (including Step 6). The full data pipeline is live:
+1. RSS articles fetched client-side → stored in Firestore
+2. Claude Haiku 4.5 analyzes articles against user profile → generates brief + skill gaps
+3. Trend labels computed client-side from historical Firestore data
+4. Radar screen streams live brief from Firestore with loading/error/empty states
 
 **Next steps:**
-1. Step 6: Claude API integration (summarize articles → generate DailyBrief + SkillGaps)
-2. Step 10: Push notifications (FCM)
-3. Step 11: Polish (animations, error states, offline mode)
-4. Phase B: Move RSS to server-side Cloud Function when Blaze plan is active
+1. Step 10: Push notifications (FCM)
+2. Step 11: Polish (animations, error states, offline mode)
+3. Phase B: Move RSS + Claude to server-side Cloud Functions when Blaze plan is active

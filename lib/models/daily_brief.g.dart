@@ -21,7 +21,7 @@ Map<String, dynamic> _$$DailyBriefImplToJson(_$DailyBriefImpl instance) =>
     <String, dynamic>{
       'summary': instance.summary,
       'gapCount': instance.gapCount,
-      'gaps': instance.gaps,
+      'gaps': instance.gaps.map((e) => e.toJson()).toList(),
     };
 
 _$SkillGapImpl _$$SkillGapImplFromJson(Map<String, dynamic> json) =>
