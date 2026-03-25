@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
 import '../../../models/article.dart';
@@ -14,7 +15,32 @@ class RssService {
   final Dio _dio;
 
   /// Per-source rate limit tracking (subreddit → last fetch time).
-  final Map<String, DateTime> _lastFetch = {};
+  /// Loaded from SharedPreferences on first access.
+  Map<String, DateTime>? _lastFetch;
+
+  Future<Map<String, DateTime>> _getLastFetch() async {
+    if (_lastFetch != null) return _lastFetch!;
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList('rss_last_fetch') ?? [];
+    _lastFetch = {};
+    for (final entry in stored) {
+      final parts = entry.split('=');
+      if (parts.length == 2) {
+        final dt = DateTime.tryParse(parts[1]);
+        if (dt != null) _lastFetch![parts[0]] = dt;
+      }
+    }
+    return _lastFetch!;
+  }
+
+  Future<void> _persistLastFetch() async {
+    if (_lastFetch == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final entries = _lastFetch!.entries
+        .map((e) => '${e.key}=${e.value.toIso8601String()}')
+        .toList();
+    await prefs.setStringList('rss_last_fetch', entries);
+  }
 
   /// Fetches articles from all enabled sources, skipping failures.
   Future<List<Article>> fetchAllSources(List<String> enabledSources) async {
@@ -24,8 +50,8 @@ class RssService {
       try {
         final fetched = await _fetchSource(source);
         articles.addAll(fetched);
-      } catch (_) {
-        // Skip failing source — partial results are acceptable.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch $source: $e');
       }
     }
 
@@ -51,7 +77,8 @@ class RssService {
   Future<List<Article>> _fetchReddit(String subreddit) async {
     // Rate limit: max once per 60 minutes per subreddit.
     final key = 'reddit_$subreddit';
-    final last = _lastFetch[key];
+    final rateLimits = await _getLastFetch();
+    final last = rateLimits[key];
     if (last != null && DateTime.now().difference(last).inMinutes < 60) {
       return [];
     }
@@ -68,7 +95,8 @@ class RssService {
       ),
     );
 
-    _lastFetch[key] = DateTime.now();
+    rateLimits[key] = DateTime.now();
+    _persistLastFetch();
     final doc = XmlDocument.parse(response.data!);
     final entries = doc.findAllElements('entry');
     final now = DateTime.now();
@@ -95,7 +123,8 @@ class RssService {
 
   Future<List<Article>> _fetchHackerNews() async {
     const key = 'hn';
-    final last = _lastFetch[key];
+    final rateLimits = await _getLastFetch();
+    final last = rateLimits[key];
     if (last != null && DateTime.now().difference(last).inMinutes < 60) {
       return [];
     }
@@ -104,7 +133,8 @@ class RssService {
       'https://hacker-news.firebaseio.com/v0/topstories.json',
     );
 
-    _lastFetch[key] = DateTime.now();
+    rateLimits[key] = DateTime.now();
+    _persistLastFetch();
     final ids = (idsResponse.data ?? []).take(20);
     final articles = <Article>[];
     final now = DateTime.now();
@@ -132,8 +162,8 @@ class RssService {
           ),
           fetchedAt: now,
         ));
-      } catch (_) {
-        // Skip individual items that fail.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch HN item $id: $e');
       }
     }
 
@@ -149,7 +179,8 @@ class RssService {
 
   Future<List<Article>> _fetchBlogs() async {
     const key = 'blogs';
-    final last = _lastFetch[key];
+    final rateLimits = await _getLastFetch();
+    final last = rateLimits[key];
     if (last != null && DateTime.now().difference(last).inMinutes < 60) {
       return [];
     }
@@ -182,12 +213,13 @@ class RssService {
             fetchedAt: now,
           ));
         }
-      } catch (_) {
-        // Skip failing blog feeds.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch blog $feedUrl: $e');
       }
     }
 
-    _lastFetch[key] = DateTime.now();
+    rateLimits[key] = DateTime.now();
+    _persistLastFetch();
     return articles;
   }
 
