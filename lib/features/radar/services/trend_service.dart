@@ -51,6 +51,6 @@ class TrendService {
       return 'rising';
     }
 
-    return 'new';
+    return 'stable';
   }
 }

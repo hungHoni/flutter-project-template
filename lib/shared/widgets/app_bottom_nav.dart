@@ -89,10 +89,14 @@ class _NavItem extends StatelessWidget {
     final color = isActive ? AppColors.primary : AppColors.textMeta;
 
     return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: SizedBox(
+      child: Semantics(
+        label: label,
+        button: true,
+        selected: isActive,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
           height: 56,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -153,6 +157,7 @@ class _NavItem extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

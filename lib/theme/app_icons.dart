@@ -21,6 +21,7 @@ class AppIcons {
   static final PhosphorIconData trendUp = PhosphorIcons.arrowUp();
   static final PhosphorIconData trendHot = PhosphorIcons.fire();
   static final PhosphorIconData trendNew = PhosphorIcons.sparkle();
+  static final PhosphorIconData trendStable = PhosphorIcons.minus();
 
   // ── Actions ──
   static final PhosphorIconData arrowRight = PhosphorIcons.arrowRight();

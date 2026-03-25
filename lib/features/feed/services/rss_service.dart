@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xml/xml.dart';
 
@@ -24,8 +24,8 @@ class RssService {
       try {
         final fetched = await _fetchSource(source);
         articles.addAll(fetched);
-      } catch (_) {
-        // Skip failing source — partial results are acceptable.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch $source: $e');
       }
     }
 
@@ -132,8 +132,8 @@ class RssService {
           ),
           fetchedAt: now,
         ));
-      } catch (_) {
-        // Skip individual items that fail.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch HN item $id: $e');
       }
     }
 
@@ -182,8 +182,8 @@ class RssService {
             fetchedAt: now,
           ));
         }
-      } catch (_) {
-        // Skip failing blog feeds.
+      } catch (e) {
+        debugPrint('[RssService] Failed to fetch blog $feedUrl: $e');
       }
     }
 
