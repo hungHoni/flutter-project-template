@@ -66,11 +66,13 @@ class ClaudeService {
   ClaudeService(this._apiKey);
   final String _apiKey;
 
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://api.anthropic.com',
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 60),
-  ));
+  Dio? _dioInstance;
+
+  Dio get _dio => _dioInstance ??= Dio(BaseOptions(
+        baseUrl: 'https://api.anthropic.com',
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+      ));
 
   /// Whether the API key is configured.
   bool get hasApiKey => _apiKey.isNotEmpty;
@@ -82,10 +84,7 @@ class ClaudeService {
     required Map<String, String> articleIdMap,
   }) async {
     if (_apiKey.isEmpty) {
-      throw Exception(
-        'ANTHROPIC_API_KEY not set. Run with: '
-        'flutter run --dart-define=ANTHROPIC_API_KEY=sk-ant-...',
-      );
+      throw Exception('ANTHROPIC_API_KEY not configured.');
     }
 
     if (articles.isEmpty) {
@@ -142,14 +141,14 @@ $articlesText
     return _parseResponse(text);
   }
 
+  static final _fencePattern = RegExp(r'^```\w*\n([\s\S]*?)```$');
+
   ClaudeAnalysisResult _parseResponse(String text) {
     // Strip markdown code fences if present.
     var cleaned = text.trim();
-    if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(cleaned.indexOf('\n') + 1);
-      if (cleaned.endsWith('```')) {
-        cleaned = cleaned.substring(0, cleaned.lastIndexOf('```'));
-      }
+    final fenceMatch = _fencePattern.firstMatch(cleaned);
+    if (fenceMatch != null) {
+      cleaned = fenceMatch.group(1)!;
     }
 
     final json = jsonDecode(cleaned.trim()) as Map<String, dynamic>;
@@ -177,7 +176,8 @@ $articlesText
   }
 
   void dispose() {
-    _dio.close();
+    _dioInstance?.close();
+    _dioInstance = null;
   }
 }
 
