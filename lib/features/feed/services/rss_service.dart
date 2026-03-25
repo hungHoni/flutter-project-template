@@ -190,9 +190,26 @@ class RssService {
 
   // ── Helpers ──
 
-  /// Strips HTML tags and truncates to 200 characters.
+  /// Strips HTML tags, decodes entities, removes URLs, and truncates.
   String _stripHtml(String html) {
-    final text = html.replaceAll(RegExp(r'<[^>]*>'), '').trim();
+    // Remove HTML tags.
+    var text = html.replaceAll(RegExp(r'<[^>]*>'), '');
+    // Decode common HTML entities.
+    text = text
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll('&apos;', "'")
+        .replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
+          final code = int.tryParse(m.group(1)!);
+          return code != null ? String.fromCharCode(code) : m.group(0)!;
+        });
+    // Remove raw URLs that leak from Reddit content.
+    text = text.replaceAll(RegExp(r'https?://\S+'), '').trim();
+    // Collapse multiple whitespace.
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (text.length <= 200) return text;
     return '${text.substring(0, 197)}...';
   }
