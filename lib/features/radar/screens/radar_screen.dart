@@ -210,7 +210,7 @@ class _RadarScreenState extends ConsumerState<RadarScreen> {
   String _errorMessage(Object? error) {
     final msg = error?.toString() ?? 'Unknown error';
     if (msg.contains('ANTHROPIC_API_KEY')) {
-      return 'API key not configured.\nRun with:\nflutter run --dart-define=ANTHROPIC_API_KEY=sk-ant-...';
+      return 'AI analysis is not available right now.\nPlease check your configuration and try again.';
     }
     if (msg.contains('No articles')) {
       return 'No articles yet. Go to the Feed tab and pull down to fetch.';
