@@ -16,9 +16,9 @@ class ExperienceStep extends StatelessWidget {
   final ValueChanged<String> onLevelSelected;
 
   static const _levels = [
-    _Level('beginner', 'Beginner', 'Just getting started with AI'),
-    _Level('intermediate', 'Intermediate', 'Building projects and experimenting'),
-    _Level('advanced', 'Advanced', 'Production experience with AI systems'),
+    _Level('Beginner', 'Beginner', 'Just getting started with AI'),
+    _Level('Intermediate', 'Intermediate', 'Building projects and experimenting'),
+    _Level('Advanced', 'Advanced', 'Production experience with AI systems'),
   ];
 
   @override
