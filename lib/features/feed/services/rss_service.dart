@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:xml/xml.dart';
 
@@ -59,7 +60,9 @@ class RssService {
       'https://www.reddit.com/r/$subreddit/hot.rss',
       options: Options(
         headers: {
-          'User-Agent': 'AISkillRadar/1.0 (Flutter; personal use)',
+          // User-Agent cannot be set in browser XHR requests; only set on native.
+          if (!kIsWeb)
+            'User-Agent': 'AISkillRadar/1.0 (Flutter; personal use)',
         },
         responseType: ResponseType.plain,
       ),
