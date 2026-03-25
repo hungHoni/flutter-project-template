@@ -66,11 +66,13 @@ class ClaudeService {
   ClaudeService(this._apiKey);
   final String _apiKey;
 
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: 'https://api.anthropic.com',
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 60),
-  ));
+  Dio? _dioInstance;
+
+  Dio get _dio => _dioInstance ??= Dio(BaseOptions(
+        baseUrl: 'https://api.anthropic.com',
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+      ));
 
   /// Whether the API key is configured.
   bool get hasApiKey => _apiKey.isNotEmpty;
@@ -174,7 +176,8 @@ $articlesText
   }
 
   void dispose() {
-    _dio.close();
+    _dioInstance?.close();
+    _dioInstance = null;
   }
 }
 
