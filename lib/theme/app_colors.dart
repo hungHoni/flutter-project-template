@@ -30,4 +30,12 @@ class AppColors {
   // ── Semantic ──
   static const Color error = Color(0xFFDC3545);
   static const Color success = Color(0xFF28A745);
+
+  // ── Dark mode equivalents ──
+  static const Color surfaceDarkMode = Color(0xFF121212);
+  static const Color backgroundDarkMode = Color(0xFF1E1E1E);
+  static const Color borderDarkMode = Color(0xFF2E2E2E);
+  static const Color textPrimaryDarkMode = Color(0xFFF0F0F0);
+  static const Color textSecondaryDarkMode = Color(0xFFAAAAAA);
+  static const Color textMetaDarkMode = Color(0xFF888888);
 }
