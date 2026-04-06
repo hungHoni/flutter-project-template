@@ -13,7 +13,7 @@ class AppTypography {
 
   // ── Serif (display / headline) ──
 
-  static TextStyle get display => GoogleFonts.instrumentSerif(
+  static final TextStyle display = GoogleFonts.instrumentSerif(
         fontSize: 28,
         fontWeight: FontWeight.w400,
         height: 1.2,
@@ -21,7 +21,7 @@ class AppTypography {
         color: AppColors.textPrimary,
       );
 
-  static TextStyle get headline => GoogleFonts.instrumentSerif(
+  static final TextStyle headline = GoogleFonts.instrumentSerif(
         fontSize: 20,
         fontWeight: FontWeight.w400,
         height: 1.3,
@@ -31,21 +31,21 @@ class AppTypography {
 
   // ── Sans-serif (body / interactive) ──
 
-  static TextStyle get title => GoogleFonts.dmSans(
+  static final TextStyle title = GoogleFonts.dmSans(
         fontSize: 16,
         fontWeight: FontWeight.w500,
         height: 1.4,
         color: AppColors.textPrimary,
       );
 
-  static TextStyle get body => GoogleFonts.dmSans(
+  static final TextStyle body = GoogleFonts.dmSans(
         fontSize: 14,
         fontWeight: FontWeight.w400,
         height: 1.6,
         color: AppColors.textPrimary,
       );
 
-  static TextStyle get button => GoogleFonts.dmSans(
+  static final TextStyle button = GoogleFonts.dmSans(
         fontSize: 15,
         fontWeight: FontWeight.w500,
         height: 1.0,
@@ -55,7 +55,7 @@ class AppTypography {
 
   // ── Monospace (label / meta / caption) ──
 
-  static TextStyle get label => GoogleFonts.jetBrainsMono(
+  static final TextStyle label = GoogleFonts.jetBrainsMono(
         fontSize: 11,
         fontWeight: FontWeight.w400,
         height: 1.4,
@@ -63,7 +63,7 @@ class AppTypography {
         color: AppColors.textSecondary,
       );
 
-  static TextStyle get meta => GoogleFonts.jetBrainsMono(
+  static final TextStyle meta = GoogleFonts.jetBrainsMono(
         fontSize: 10,
         fontWeight: FontWeight.w400,
         height: 1.4,
@@ -71,7 +71,7 @@ class AppTypography {
         color: AppColors.textMeta,
       );
 
-  static TextStyle get caption => GoogleFonts.jetBrainsMono(
+  static final TextStyle caption = GoogleFonts.jetBrainsMono(
         fontSize: 12,
         fontWeight: FontWeight.w400,
         height: 1.5,
